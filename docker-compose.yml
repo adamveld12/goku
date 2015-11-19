@@ -1,0 +1,13 @@
+goku:
+  build: .
+  ports:
+    - "8080:80"
+    - "2222:22"
+  volumes:
+   - .:/go/src/gtihub.com/adamveld12/goku/
+   - /var/run/docker.sock:/var/run/docker.sock
+  links:
+    - consul
+
+consul:
+  image: smebberson/alpine-consul
