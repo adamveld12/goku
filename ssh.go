@@ -21,13 +21,17 @@ import (
 
 const (
 	prereceiveHookTemplate = `#!/bin/bash
-echo "Running hook"
 go run /go/src/github.com/adamveld12/goku/*.go -debug hook %s
-echo $@
-exit 0
 `
 	prereceiveHookPath = `hooks/pre-receive`
 )
+
+func fingerprint(pubkey ssh.PublicKey) string {
+	h := md5.New()
+	h.Write(pubkey.Marshal())
+
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
 
 func gitListen(host, gitPath string) {
 	if _, err := os.Stat(gitPath); err != nil {
@@ -40,20 +44,16 @@ func gitListen(host, gitPath string) {
 	serverConfig := ssh.ServerConfig{
 		PublicKeyCallback: func(connMeta ssh.ConnMetadata, key ssh.PublicKey) (permissions *ssh.Permissions, err error) {
 			username := connMeta.User()
-			h := md5.New()
-			h.Write(key.Marshal())
 
-			LogDebugf("%s - %s %x", username, key.Type(), h.Sum(nil))
+			LogDebugf("%s - %s %s", username, key.Type(), fingerprint(key))
 
 			if username != "git" {
 				return nil, errors.New("User not found")
 			}
 
-			permissions = &ssh.Permissions{
-				CriticalOptions: map[string]string{},
-			}
-
+			permissions = &ssh.Permissions{}
 			err = nil
+
 			return
 		},
 	}
@@ -87,7 +87,7 @@ func serveSSHConn(nConn net.Conn, serverConfig *ssh.ServerConfig, gitPath string
 	_, newChans, reqChan, err := ssh.NewServerConn(nConn, serverConfig)
 
 	if err != nil && err != io.EOF {
-		LogError(err.Error())
+		LogErr(err)
 		return
 	}
 
@@ -142,7 +142,7 @@ func processPush(conn ssh.Channel, sshOriginalCommand, repositoryRootPath string
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(repoPath, os.ModeDir); err != nil {
 			err = errors.New("Could not make directories for repository")
-			LogError(err.Error())
+			LogErr(err)
 			return err
 		}
 
@@ -208,7 +208,7 @@ func createReceiveHook(repoPath string) error {
 	fh, err := os.OpenFile(finalHookPath, os.O_CREATE|os.O_RDWR, 7550)
 
 	if err != nil {
-		LogError(err.Error())
+		LogErr(err)
 		return err
 	}
 
@@ -230,7 +230,7 @@ func createRepository(repoPath string) error {
 	LogDebugf("creating a repository at %s", repoPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		LogError(err.Error())
+		LogErr(err)
 		return errors.New("could not create remote repository")
 	}
 

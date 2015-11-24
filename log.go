@@ -43,8 +43,10 @@ func LogFatal(err string) {
 }
 
 func LogFatalErr(err error) {
-	printLog(Fatal, "%s", err)
-	panic(err)
+	if err != nil {
+		printLog(Fatal, "%s", err)
+		panic(err)
+	}
 }
 
 func LogDebug(output string) {
@@ -53,6 +55,12 @@ func LogDebug(output string) {
 
 func LogDebugf(fmtString string, arguments ...interface{}) {
 	printLog(Debug, fmtString, arguments...)
+}
+
+func LogErr(err error) {
+	if err != nil {
+		printLog(Error, "%s", err.Error())
+	}
 }
 
 func LogError(output string) {

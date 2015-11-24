@@ -6,7 +6,6 @@ import (
 	"github.com/adamveld12/commando"
 
 	"flag"
-	"fmt"
 )
 
 var (
@@ -24,12 +23,17 @@ func main() {
 
 	app := commando.New()
 
-	app.Add("hook build", "builds a repository from the specified path and branch", hook)
+	app.Add("generate-config", "generates a commented config.json with sane defaults at the specified location", genConfig)
+	app.Add("hook build", "builds a repository from the specified path and branch", runHook)
 	app.Add("upload-key", "uploads a public key to this repository", uploadKey)
 
 	if err := app.Execute(flag.Args()...); err != nil {
 		serverMode()
 	}
+}
+
+func genConfig(path string) {
+
 }
 
 func serverMode() {
@@ -39,8 +43,4 @@ func serverMode() {
 
 func uploadKey(username string) {
 	// read from stdin
-}
-
-func hook(path string) {
-	fmt.Printf("The hook says your repo is here:\n%s", path)
 }
