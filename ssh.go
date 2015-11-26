@@ -16,12 +16,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/adamveld12/goku/log"
+
 	"golang.org/x/crypto/ssh"
 )
 
 const (
 	prereceiveHookTemplate = `#!/bin/bash
-go run /go/src/github.com/adamveld12/goku/*.go -debug hook %s
+go run $GOPATH/src/github.com/adamveld12/goku/*.go -debug hook %s
 `
 	prereceiveHookPath = `hooks/pre-receive`
 )
@@ -35,9 +37,9 @@ func fingerprint(pubkey ssh.PublicKey) string {
 
 func gitListen(host, gitPath string) {
 	if _, err := os.Stat(gitPath); err != nil {
-		LogDebugf("creating repository directory at \"%s\"", gitPath)
+		log.Debugf("creating repository directory at \"%s\"", gitPath)
 		if err = os.MkdirAll(gitPath, os.ModeDir); err != nil {
-			LogFatal(fmt.Sprintf("cannot create directory for git repositories at %s", gitPath))
+			log.Fatal(fmt.Sprintf("cannot create directory for git repositories at %s", gitPath))
 		}
 	}
 
@@ -45,7 +47,7 @@ func gitListen(host, gitPath string) {
 		PublicKeyCallback: func(connMeta ssh.ConnMetadata, key ssh.PublicKey) (permissions *ssh.Permissions, err error) {
 			username := connMeta.User()
 
-			LogDebugf("%s - %s %s", username, key.Type(), fingerprint(key))
+			log.Debugf("%s - %s %s", username, key.Type(), fingerprint(key))
 
 			if username != "git" {
 				return nil, errors.New("User not found")
@@ -60,7 +62,7 @@ func gitListen(host, gitPath string) {
 
 	privateKey, err := getPrivateKey()
 	if err != nil {
-		LogFatalErr(err)
+		log.FatalErr(err)
 	}
 
 	serverConfig.AddHostKey(privateKey)
@@ -68,7 +70,7 @@ func gitListen(host, gitPath string) {
 	listener, err := net.Listen("tcp", host)
 
 	if err != nil {
-		LogFatal(fmt.Sprintf("failed to listen for connection:\n%s", err.Error()))
+		log.Fatal(fmt.Sprintf("failed to listen for connection:\n%s", err.Error()))
 	}
 
 	for {
@@ -87,7 +89,7 @@ func serveSSHConn(nConn net.Conn, serverConfig *ssh.ServerConfig, gitPath string
 	_, newChans, reqChan, err := ssh.NewServerConn(nConn, serverConfig)
 
 	if err != nil && err != io.EOF {
-		LogErr(err)
+		log.Err(err)
 		return
 	}
 
@@ -103,7 +105,7 @@ func serveSSHConn(nConn net.Conn, serverConfig *ssh.ServerConfig, gitPath string
 		channel, requests, err := newChan.Accept()
 
 		if err != nil {
-			LogErrorf("Could not accept ssh connection: %s", err.Error())
+			log.Errorf("Could not accept ssh connection: %s", err.Error())
 		}
 
 		go func(in <-chan *ssh.Request) {
@@ -114,10 +116,10 @@ func serveSSHConn(nConn net.Conn, serverConfig *ssh.ServerConfig, gitPath string
 					sshCommand := string(req.Payload)
 					exitStatus := []byte{0, 0, 0, 0}
 					if err := processPush(channel, sshCommand, gitPath); err != nil {
-						LogErrorf("could not process git push\n%s", err.Error())
+						log.Errorf("could not process git push\n%s", err.Error())
 						exitStatus = []byte{0, 0, 0, 1}
 					}
-					LogDebug("git push processed successfully")
+					log.Debug("git push processed successfully")
 					channel.SendRequest("exit-status", false, exitStatus)
 					req.Reply(true, nil)
 					return
@@ -131,7 +133,7 @@ func serveSSHConn(nConn net.Conn, serverConfig *ssh.ServerConfig, gitPath string
 }
 
 func processPush(conn ssh.Channel, sshOriginalCommand, repositoryRootPath string) error {
-	LogDebugf("ORIGINAL COMMAND: %s", sshOriginalCommand)
+	log.Debugf("ORIGINAL COMMAND: %s", sshOriginalCommand)
 
 	tokens := strings.Split(sshOriginalCommand, " ")
 	tokenLen := len(tokens)
@@ -142,7 +144,7 @@ func processPush(conn ssh.Channel, sshOriginalCommand, repositoryRootPath string
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(repoPath, os.ModeDir); err != nil {
 			err = errors.New("Could not make directories for repository")
-			LogErr(err)
+			log.Err(err)
 			return err
 		}
 
@@ -163,7 +165,7 @@ func processPush(conn ssh.Channel, sshOriginalCommand, repositoryRootPath string
 	cmd.Stdout = conn
 
 	if err := cmd.Run(); err != nil {
-		LogErrorf("receive pack failed %s", err.Error())
+		log.Errorf("receive pack failed %s", err.Error())
 		return err
 	}
 
@@ -208,7 +210,7 @@ func createReceiveHook(repoPath string) error {
 	fh, err := os.OpenFile(finalHookPath, os.O_CREATE|os.O_RDWR, 7550)
 
 	if err != nil {
-		LogErr(err)
+		log.Err(err)
 		return err
 	}
 
@@ -227,14 +229,14 @@ func createRepository(repoPath string) error {
 	cmd := exec.Command("git", "init", "--bare")
 	cmd.Dir = repoPath
 
-	LogDebugf("creating a repository at %s", repoPath)
+	log.Debugf("creating a repository at %s", repoPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		LogErr(err)
+		log.Err(err)
 		return errors.New("could not create remote repository")
 	}
 
-	LogDebug(string(output))
+	log.Debug(string(output))
 
 	return nil
 }
