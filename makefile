@@ -1,15 +1,11 @@
 # Base run commad
-RUN=docker run -v /var/run/docker.sock:/var/run/docker.sock -v $$(which docker):/bin/docker
+RUN=docker run -v /var/run/docker.sock:/var/run/docker.sock -v $$(which docker):/bin/docker -v $$(which docker-compose):/bin/docker-compose
 BUILD=docker build -t
-UPLOAD=cat ./bin/authorized_keys | ssh root@$$(docker-machine ip default) "gitreceive upload-key test"
 
 up: build
 	docker-compose up
 
-upload: 
-	$(UPLOAD)
-
-build: build_goku
+build:
 	$(BUILD) adamveld12/goku .
 
 build_goku:

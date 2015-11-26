@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/adamveld12/commando"
+	"github.com/adamveld12/goku/hook"
 
 	"flag"
 )
@@ -24,8 +25,7 @@ func main() {
 	app := commando.New()
 
 	app.Add("generate-config", "generates a commented config.json with sane defaults at the specified location", genConfig)
-	app.Add("hook build", "builds a repository from the specified path and branch", runHook)
-	app.Add("upload-key", "uploads a public key to this repository", uploadKey)
+	app.Add("hook build", "builds a repository from the specified path and branch", hook.Run)
 
 	if err := app.Execute(flag.Args()...); err != nil {
 		serverMode()
@@ -39,8 +39,4 @@ func genConfig(path string) {
 func serverMode() {
 	// go dashboardListen(*dashboardHost)
 	gitListen(*sshHost, *gitPath)
-}
-
-func uploadKey(username string) {
-	// read from stdin
 }
