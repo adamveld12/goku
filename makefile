@@ -1,5 +1,5 @@
 # Base run commad
-RUN=docker run -v /var/run/docker.sock:/var/run/docker.sock -v $$(which docker):/bin/docker -v $$(which docker-compose):/bin/docker-compose
+RUN=docker run -v /var/run/docker.sock:/var/run/docker.sock -v $$(which docker-compose):/bin/docker-compose
 BUILD=docker build -t
 
 up: build

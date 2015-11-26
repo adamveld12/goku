@@ -1,6 +1,5 @@
 FROM golang:1.5.1-wheezy
 
-
 COPY . /go/src/github.com/adamveld12/goku/
 WORKDIR /go/src/github.com/adamveld12/goku/
 

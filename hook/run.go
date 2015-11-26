@@ -34,7 +34,6 @@ func Run(path string) {
 		fmt.Println(err.Error())
 		os.Exit(128)
 	}
-
 	if err := builder(proj); err != nil {
 		fmt.Println("could not build repository")
 		os.Exit(128)

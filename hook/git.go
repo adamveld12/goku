@@ -52,6 +52,7 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 	}
 
 	proj := repository{
+		Domain:  fmt.Sprintf("%s.192.168.99.101.xip.io", repoName),
 		Branch:  branch,
 		Name:    repoName,
 		Archive: &archive,
@@ -90,6 +91,12 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 		if fName == string(Composefile) {
 			proj.Type = Composefile
 			proj.TargetFilePath = fmt.Sprintf("%s/%s", proj.Name, fName)
+		}
+
+		if fName == string("CNAME") {
+			data, _ := ioutil.ReadAll(arch)
+			proj.Domain = string(data)
+			fmt.Println("Using domain", proj.Domain)
 		}
 	}
 

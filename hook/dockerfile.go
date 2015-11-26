@@ -15,9 +15,16 @@ const (
 	None        = projectType("None")
 )
 
+type container struct {
+	Name  string
+	Ports []string
+	ID    string
+}
+
 type repository struct {
 	Type           projectType
 	Files          []string
+	Domain         string
 	TargetFilePath string
 	Name           string
 	Branch         string
@@ -97,7 +104,7 @@ func launchContainer(client *docker.Client, name string) (*docker.Container, err
 		return nil, err
 	}
 
-	return container, nil
+	return client.InspectContainer(container.ID)
 }
 
 func Container(proj repository) error {
@@ -122,6 +129,11 @@ func Container(proj repository) error {
 		return err
 	}
 
+	if err := publish(proj, container); err != nil {
+		return err
+	}
+
 	fmt.Println(container.ID)
+
 	return nil
 }
