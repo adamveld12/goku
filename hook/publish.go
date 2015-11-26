@@ -5,13 +5,14 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/adamveld12/goku/log"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
 const nginxTemplate = `
 server {
-    listen 80;
-    server_name %s
+    listen 0.0.0.0:80;
+    server_name %s;
 
     location / {
         proxy_set_header X-Real-IP $remote_addr;
@@ -27,7 +28,8 @@ server {
 func saveNginxProfile(domain, name, ip, port string) error {
 	fmt.Println("\n")
 	nginxConf := fmt.Sprintf(nginxTemplate, domain, port)
-	fmt.Println(nginxConf)
+
+	log.Debug(nginxConf)
 
 	siteAvailablePath := fmt.Sprintf("/etc/nginx/sites-available/%s", name)
 	fout, err := os.Create(siteAvailablePath)
@@ -47,7 +49,7 @@ func saveNginxProfile(domain, name, ip, port string) error {
 		return err
 	}
 
-	reload := exec.Command("nginx", "reload")
+	reload := exec.Command("service", "nginx", "reload")
 	return reload.Run()
 }
 

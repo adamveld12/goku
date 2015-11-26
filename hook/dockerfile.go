@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/adamveld12/goku/log"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
@@ -50,6 +51,7 @@ func cleanDuplicateContainer(client *docker.Client, name string) error {
 				fmt.Println("stopping", name)
 				if err := client.KillContainer(docker.KillContainerOptions{ID: container.ID}); err != nil {
 					fmt.Println("could not stop container")
+					log.DebugErr(err)
 					return err
 				}
 			}
@@ -87,6 +89,7 @@ func launchContainer(client *docker.Client, name string) (*docker.Container, err
 	images, err := client.ListImages(docker.ListImagesOptions{Filter: name})
 
 	if err != nil {
+		log.DebugErr(err)
 		return nil, err
 	}
 
@@ -97,10 +100,12 @@ func launchContainer(client *docker.Client, name string) (*docker.Container, err
 	})
 
 	if err != nil {
+		log.DebugErr(err)
 		return nil, err
 	}
 
 	if err := client.StartContainer(container.ID, &docker.HostConfig{PublishAllPorts: true}); err != nil {
+		log.DebugErr(err)
 		return nil, err
 	}
 
@@ -113,23 +118,28 @@ func Container(proj repository) error {
 	endpoint := fmt.Sprintf("unix://%s", "/var/run/docker.sock")
 	client, err := docker.NewClient(endpoint)
 	if err != nil {
+		log.DebugErr(err)
 		return err
 	}
 
 	if err := cleanDuplicateContainer(client, proj.Name); err != nil {
+		log.DebugErr(err)
 		return err
 	}
 
 	if err := buildImage(client, proj.Name, *proj.Archive); err != nil {
+		log.DebugErr(err)
 		return err
 	}
 
 	container, err := launchContainer(client, proj.Name)
 	if err != nil {
+		log.DebugErr(err)
 		return err
 	}
 
 	if err := publish(proj, container); err != nil {
+		log.DebugErr(err)
 		return err
 	}
 
