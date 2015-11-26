@@ -12,7 +12,7 @@ build_goku:
 	go build -o ./bin/goku .
 
 dev:
-	$(RUN) -v $$PWD/:/go/src/github.com/adamveld12/goku --rm -it -p 2222:22 --entrypoint /bin/bash adamveld12/goku
+	$(RUN) -v $$PWD/:/go/src/github.com/adamveld12/goku --rm -it -p 3000:80 -p 2222:22 --entrypoint /bin/bash adamveld12/goku
 
 live: build
 	$(RUN) -d -p 2222:22 adamveld12/goku && $(UPLOAD)

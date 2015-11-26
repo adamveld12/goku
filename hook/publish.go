@@ -2,12 +2,15 @@ package hook
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
 
 const nginxTemplate = `
 server {
+    listen 80;
     server_name %s
 
     location / {
@@ -21,10 +24,31 @@ server {
 }
 `
 
-func saveNginxProfile(domain, name, ip, port string) {
+func saveNginxProfile(domain, name, ip, port string) error {
 	fmt.Println("\n")
 	nginxConf := fmt.Sprintf(nginxTemplate, domain, port)
 	fmt.Println(nginxConf)
+
+	siteAvailablePath := fmt.Sprintf("/etc/nginx/sites-available/%s", name)
+	fout, err := os.Create(siteAvailablePath)
+	if err != nil {
+		return err
+	}
+	defer fout.Close()
+
+	if _, err = fout.WriteString(nginxConf); err != nil {
+		return err
+	}
+
+	siteEnabledPath := fmt.Sprintf("/etc/nginx/sites-enabled/%s", name)
+
+	if _, err := os.Stat(siteEnabledPath); os.IsNotExist(err) && os.Symlink(siteAvailablePath, siteEnabledPath) != nil {
+		fmt.Println("sym link failed")
+		return err
+	}
+
+	reload := exec.Command("nginx", "reload")
+	return reload.Run()
 }
 
 func publish(proj repository, container *docker.Container) error {
@@ -40,11 +64,5 @@ func publish(proj repository, container *docker.Container) error {
 		}
 	}
 
-	// write template to /etc/nginx/sites-available
-	saveNginxProfile(proj.Domain, proj.Name, port.HostIP, port.HostPort)
-
-	// sym link template output to /etc/nginx/sites-enabled
-	// reload nginx via nginx reload
-
-	return nil
+	return saveNginxProfile(proj.Domain, proj.Name, port.HostIP, port.HostPort)
 }
