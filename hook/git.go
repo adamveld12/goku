@@ -110,7 +110,7 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 		if fName == string("CNAME") {
 			data, _ := ioutil.ReadAll(arch)
 			proj.Domain = string(data)
-			fmt.Println("Using domain", proj.Domain)
+			log.Debugf("Using domain %s", proj.Domain)
 		}
 	}
 
