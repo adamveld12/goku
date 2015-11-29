@@ -117,12 +117,9 @@ type User struct {
 func init() {
 	req, _ := http.NewRequest("GET", "http://ipv4.icanhazip.com/", bytes.NewBuffer([]byte{}))
 
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
+	ip = "127.0.0.1"
+	if res, err := http.DefaultClient.Do(req); err == nil {
+		body, _ := ioutil.ReadAll(res.Body)
+		ip = string(body)
 	}
-
-	data, _ := ioutil.ReadAll(res.Body)
-
-	ip = string(data)
 }
