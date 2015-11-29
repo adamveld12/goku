@@ -27,30 +27,43 @@ server {
 
 func saveNginxProfile(domain, name, ip, port string) error {
 	fmt.Println("\n")
-	nginxConf := fmt.Sprintf(nginxTemplate, domain, port)
-
-	log.Debug(nginxConf)
 
 	siteAvailablePath := fmt.Sprintf("/etc/nginx/sites-available/%s", name)
 	fout, err := os.Create(siteAvailablePath)
 	if err != nil {
+		log.Debugf("could not create nginx configuration file for %s", name)
 		return err
 	}
+
 	defer fout.Close()
 
+	nginxConf := fmt.Sprintf(nginxTemplate, name, port)
+
+	log.Debug(nginxConf)
 	if _, err = fout.WriteString(nginxConf); err != nil {
+		log.Debugf("could not write nginx configuration for %s", name)
 		return err
 	}
 
 	siteEnabledPath := fmt.Sprintf("/etc/nginx/sites-enabled/%s", name)
 
 	if _, err := os.Stat(siteEnabledPath); os.IsNotExist(err) && os.Symlink(siteAvailablePath, siteEnabledPath) != nil {
-		fmt.Println("sym link failed")
+		log.Debug("sym link failed")
 		return err
 	}
 
-	reload := exec.Command("service", "nginx", "reload")
-	return reload.Run()
+	reloadCmd := exec.Command("service", "nginx", "reload")
+	if err := reloadCmd.Start(); err != nil {
+		log.Debugf("could not start nginx reload\n%s", err.Error())
+		return err
+	}
+
+	if err := reloadCmd.Wait(); err != nil {
+		log.Debugf("nginx reload failed\n%s", err.Error())
+		return err
+	}
+
+	return nil
 }
 
 func publish(proj repository, container *docker.Container) error {

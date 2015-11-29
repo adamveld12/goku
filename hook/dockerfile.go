@@ -79,6 +79,7 @@ func buildImage(client *docker.Client, name string, archive []byte) error {
 		InputStream:  bytes.NewBuffer(archive),
 	}); err != nil {
 		fmt.Println("Could not build image \n", err)
+		return err
 	}
 
 	return nil
@@ -128,18 +129,18 @@ func Container(proj repository) error {
 	}
 
 	if err := buildImage(client, proj.Name, *proj.Archive); err != nil {
-		log.DebugErr(err)
+		log.Debugf("could not build image\n%s", err)
 		return err
 	}
 
 	container, err := launchContainer(client, proj.Name)
 	if err != nil {
-		log.DebugErr(err)
+		log.Debugf("could not launch container\n%s", err.Error())
 		return err
 	}
 
 	if err := publish(proj, container); err != nil {
-		log.DebugErr(err)
+		log.Debugf("could not publish site\n%s", err.Error())
 		return err
 	}
 

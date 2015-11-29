@@ -11,28 +11,38 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/adamveld12/goku/log"
+)
+
+var (
+	ErrCouldNotReadRepo    = errors.New("could not read repository")
+	ErrCouldNotReceiveRepo = errors.New("could not recieve repository")
+	ErrCouldNotReadFile    = errors.New("could not read file header from archive")
 )
 
 func gitArchive(revision string) (io.Reader, error) {
 	gitArchive := exec.Command("git", "archive", "--format=tar", revision)
 	stdOut, err := gitArchive.StdoutPipe()
 	if err != nil {
-		fmt.Println("could not read push repository")
-		return nil, err
+		log.Debug("could not obtain std out pipe")
+		return nil, ErrCouldNotReadRepo
 	}
 
 	if err := gitArchive.Start(); err != nil {
-		fmt.Println("could not start checkout")
-		return nil, err
+		log.Debug("could not start git archive")
+		return nil, ErrCouldNotReadRepo
 	}
 
 	data, err := ioutil.ReadAll(stdOut)
 	if err != nil {
-		return nil, err
+		log.Debug("could not read from git archive out stream")
+		return nil, ErrCouldNotReadRepo
 	}
 
 	if err := gitArchive.Wait(); err != nil {
-		return nil, err
+		log.Debug("git archive exited with non zero exit code")
+		return nil, ErrCouldNotReadRepo
 	}
 
 	return bytes.NewBuffer(data), nil
@@ -48,7 +58,8 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 	archive, err := ioutil.ReadAll(repo)
 
 	if err != nil {
-		return repository{}, errors.New("could not recieve repository")
+		log.Debug("could not read tar of repository")
+		return repository{}, ErrCouldNotReceiveRepo
 	}
 
 	proj := repository{
@@ -68,7 +79,8 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 		}
 
 		if err != nil {
-			return repository{}, err
+			log.Debug("failed to read next file in archive")
+			return repository{}, ErrCouldNotReadRepo
 		}
 
 		if header.FileInfo().IsDir() {
