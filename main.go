@@ -30,7 +30,7 @@ func main() {
 	app := commando.New()
 
 	app.Add("generate-config", "generates a commented config.json with sane defaults at the specified location", genConfig)
-	app.Add("hook build", "builds a repository from the specified path and branch", hook.Run)
+	app.Add("hook build", "builds a repository from the specified path", hook.Run)
 
 	if err := app.Execute(flag.Args()...); err != nil {
 		serverMode()
