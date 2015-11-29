@@ -117,7 +117,7 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 	return proj, nil
 }
 
-func getRevs() (oldRev, newRev, refName string) {
+func getRevs() (string, string, string) {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Split(bufio.ScanWords)
 
@@ -127,6 +127,5 @@ func getRevs() (oldRev, newRev, refName string) {
 		inputs = append(inputs, scanner.Text())
 	}
 
-	oldRev, newRev, refName = inputs[0], inputs[1], inputs[2]
-	return
+	return inputs[0], inputs[1], inputs[2]
 }
