@@ -32,7 +32,14 @@ func fingerprint(pubkey ssh.PublicKey) string {
 	h := md5.New()
 	h.Write(pubkey.Marshal())
 
-	return fmt.Sprintf("%x", h.Sum(nil))
+	rawFinger := fmt.Sprintf("%x", h.Sum(nil))
+
+	fingerprint := ""
+	for i := 0; i < len(rawFinger); i += 2 {
+		fingerprint = fmt.Sprintf("%s:%s%s", fingerprint, string(rawFinger[i]), string(rawFinger[i+1]))
+	}
+	return strings.TrimLeft(fingerprint, ":")
+
 }
 
 func gitListen(host, gitPath string) {
