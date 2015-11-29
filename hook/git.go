@@ -63,6 +63,8 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 	}
 
 	proj := repository{
+		Type: None,
+		// TODO should be fmt.Sprintf("%.%", config.Domain, repoName)
 		Domain:  fmt.Sprintf("%s.192.168.99.101.xip.io", repoName),
 		Branch:  branch,
 		Name:    repoName,
