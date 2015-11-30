@@ -4,6 +4,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -19,10 +20,43 @@ var (
 	config  = DefaultConfig()
 	ip      = "0.0.0.0"
 	backend Backend
+
+	rawBackendType = flag.String("backend", "file", "specify a backend to use")
+	configPath     = flag.String("config", "", "path to a config.json")
+	gitPath        = flag.String("gitpath", "repositories", "the path where remote repositories are pushed")
+	sshHost        = flag.String("ssh", "0.0.0.0:22", "ssh host and port")
+	dashboardPort  = flag.String("dashboard", "0.0.0.0:80", "dashboard host and port")
+	debug          = flag.Bool("debug", false, "enable debug mode")
 )
 
-func Initialize(rawBackendType, uri string) {
-	backendType := BackendType(rawBackendType)
+func init() {
+	req, _ := http.NewRequest("GET", "http://ipv4.icanhazip.com/", bytes.NewBuffer([]byte{}))
+
+	ip = "127.0.0.1"
+	if res, err := http.DefaultClient.Do(req); err == nil {
+		body, _ := ioutil.ReadAll(res.Body)
+		ip = string(body)
+	}
+
+}
+
+// Current is a handy shortcut for getting the latest currently loaded configuration
+func Current() Configuration {
+	return config
+}
+
+// Debug returns if the app should run in debug mode
+func Debug() bool {
+	if debug == nil {
+		return false
+	}
+
+	return *debug
+}
+
+func Initialize() []string {
+	flag.Parse()
+	backendType := BackendType(*rawBackendType)
 
 	var loader BackendLoader
 	if backendType == Consul {
@@ -34,9 +68,20 @@ func Initialize(rawBackendType, uri string) {
 	}
 
 	var err error
-	if backend, err = loader(uri); err != nil {
+	if backend, err = loader(*configPath); err != nil {
 		panic(fmt.Sprintf("could not load backend\n%s", err))
 	}
+
+	config = DefaultConfig()
+	loadedConfig, err := backend.LoadConfig()
+	if err != nil {
+		if err := backend.SaveConfig(config); err != nil {
+			panic(fmt.Sprintf("could not load or save config\n%s", err.Error()))
+		}
+	}
+
+	config = loadedConfig
+	return flag.Args()
 }
 
 type BackendType string
@@ -72,6 +117,9 @@ type Configuration struct {
 	// GitHost is the host/ip address to bind to for git push
 	GitHost string `json:"git_host"`
 
+	// GitPath is the file path where pushed git repositories are stored
+	GitPath string `json:"git_path"`
+
 	// NotificationEmail is an email address that gets updates for pushes
 	NotificationEmail string `json:"notification_email"`
 
@@ -98,6 +146,7 @@ func DefaultConfig() Configuration {
 		Domain:            fmt.Sprintf("%s.xip.io", ip),
 		AdminHost:         "0.0.0.0:80",
 		GitHost:           "0.0.0.0:22",
+		GitPath:           "./repositories",
 		NotificationEmail: "sysadmin@example.com",
 		PrivateRegistry:   "",
 		DockerSock:        "/var/run/docker.sock",
@@ -112,14 +161,4 @@ type User struct {
 	Fingerprint string `json:"fingerprint"`
 	// Name is a human friendly name for this user
 	Name string `json:"username"`
-}
-
-func init() {
-	req, _ := http.NewRequest("GET", "http://ipv4.icanhazip.com/", bytes.NewBuffer([]byte{}))
-
-	ip = "127.0.0.1"
-	if res, err := http.DefaultClient.Do(req); err == nil {
-		body, _ := ioutil.ReadAll(res.Body)
-		ip = string(body)
-	}
 }

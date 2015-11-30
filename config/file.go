@@ -18,8 +18,9 @@ const (
 )
 
 var (
-	ErrNoUserFound        = errors.New("no users found")
-	ErrConfigFileNotFound = errors.New("Configuration file at the specified path does not exist")
+	ErrNoUserFound              = errors.New("no users found")
+	ErrConfigFileNotFound       = errors.New("Configuration file at the specified path does not exist")
+	ErrConfigFileCouldNotBeRead = errors.New("Configuration file at the specified path could not be read")
 )
 
 func FileBackendLoader(path string) (Backend, error) {
@@ -37,22 +38,26 @@ func (j *fileBackend) SaveConfig(config Configuration) error {
 }
 
 func (j *fileBackend) LoadConfig() (Configuration, error) {
-	data, err := ioutil.ReadFile(j.filepath)
-	config := DefaultConfig()
 
-	if err != nil && !os.IsNotExist(err) {
-		color.Red("could not read config file from location %s\n%s", j.filepath, err.Error())
-		return config, err
-	} else {
+	if _, err := os.Stat(j.filepath); os.IsNotExist(err) {
 		log.Debug("config file not found, continuing with default")
+		return DefaultConfig(), nil
 	}
 
+	data, err := ioutil.ReadFile(j.filepath)
+
+	if err != nil && os.IsExist(err) {
+		color.Red("could not read config file from location %s\n%s", j.filepath, err.Error())
+		return DefaultConfig(), ErrConfigFileCouldNotBeRead
+	}
+
+	config := DefaultConfig()
 	if err := json.Unmarshal(data, &config); err != nil {
 		log.Fatal(fmt.Sprintf("an error occured while parsing config file at %s\n%s", j.filepath, err.Error()))
-		return config, err
+		return DefaultConfig(), ErrConfigFileCouldNotBeRead
 	}
 
-	return config, nil
+	return config, err
 }
 
 func (f *fileBackend) flush() error {
