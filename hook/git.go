@@ -48,7 +48,7 @@ func gitArchive(revision string) (io.Reader, error) {
 	return bytes.NewBuffer(data), nil
 }
 
-func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
+func checkout(repo io.Reader, repoPath, branch, domain string) (repository, error) {
 	repoName := strings.Replace(strings.TrimLeft(repoPath, "repositories/"), ".git", "", -1)
 
 	if branch != "master" {
@@ -65,7 +65,7 @@ func checkout(repo io.Reader, repoPath, branch string) (repository, error) {
 	proj := repository{
 		Type: None,
 		// TODO should be fmt.Sprintf("%.%", config.Domain, repoName)
-		Domain:  fmt.Sprintf("%s.192.168.99.101.xip.io", repoName),
+		Domain:  fmt.Sprintf("%s.%s", repoName, domain),
 		Branch:  branch,
 		Name:    repoName,
 		Archive: &archive,

@@ -11,21 +11,37 @@ import (
 
 const nginxTemplate = `
 server {
-    listen 0.0.0.0:80;
+		listen 80;
+
     server_name %s;
 
     location / {
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Host $http_host;
-        proxy_set_header X-NginX-Proxy true;
+        proxy_set_header X-Real-IP $remote_addr;
 
         proxy_pass http://localhost:%s/;
     }
 }
 `
 
-func saveNginxProfile(domain, name, ip, port string) error {
+// publish publishes a container via nginx
+func publish(proj repository, container *docker.Container) error {
+
+	ports := container.NetworkSettings.Ports
+
+	var port docker.PortBinding
+	for p, binding := range ports {
+
+		if p.Port() == "80" {
+			port = binding[0]
+			break
+		}
+	}
+
+	return saveNginxProfile(proj.Domain, proj.Name, port.HostPort)
+}
+
+func saveNginxProfile(domain, name, port string) error {
 	fmt.Println("\n")
 
 	siteAvailablePath := fmt.Sprintf("/etc/nginx/sites-available/%s", name)
@@ -37,9 +53,9 @@ func saveNginxProfile(domain, name, ip, port string) error {
 
 	defer fout.Close()
 
-	nginxConf := fmt.Sprintf(nginxTemplate, name, port)
-
+	nginxConf := fmt.Sprintf(nginxTemplate, domain, port)
 	log.Debug(nginxConf)
+
 	if _, err = fout.WriteString(nginxConf); err != nil {
 		log.Debugf("could not write nginx configuration for %s", name)
 		return err
@@ -64,20 +80,4 @@ func saveNginxProfile(domain, name, ip, port string) error {
 	}
 
 	return nil
-}
-
-func publish(proj repository, container *docker.Container) error {
-
-	ports := container.NetworkSettings.Ports
-
-	var port docker.PortBinding
-	for p, binding := range ports {
-
-		if p.Port() == "80" {
-			port = binding[0]
-			break
-		}
-	}
-
-	return saveNginxProfile(proj.Domain, proj.Name, port.HostIP, port.HostPort)
 }

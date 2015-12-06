@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/adamveld12/goku/config"
 	"github.com/adamveld12/goku/log"
 
 	"golang.org/x/crypto/ssh"
@@ -23,8 +24,7 @@ import (
 
 const (
 	prereceiveHookTemplate = `#!/bin/bash
-go run $GOPATH/src/github.com/adamveld12/goku/*.go -debug hook %s
-`
+go run $GOPATH/src/github.com/adamveld12/goku/*.go -debug -domain "%s" hook %s`
 	prereceiveHookPath = `hooks/pre-receive`
 )
 
@@ -42,7 +42,10 @@ func fingerprint(pubkey ssh.PublicKey) string {
 
 }
 
-func gitListen(host, gitPath string) {
+func gitListen() {
+	config := config.Current()
+
+	gitPath := config.GitPath
 	if _, err := os.Stat(gitPath); err != nil {
 		log.Debugf("creating repository directory at \"%s\"", gitPath)
 		if err = os.MkdirAll(gitPath, os.ModeDir); err != nil {
@@ -74,7 +77,8 @@ func gitListen(host, gitPath string) {
 
 	serverConfig.AddHostKey(privateKey)
 
-	listener, err := net.Listen("tcp", host)
+	log.Debugf("Receiving git pushes at %s", config.GitHost)
+	listener, err := net.Listen("tcp", config.GitHost)
 
 	if err != nil {
 		log.Fatal(fmt.Sprintf("failed to listen for connection:\n%s", err.Error()))
@@ -82,6 +86,7 @@ func gitListen(host, gitPath string) {
 
 	for {
 		nConn, err := listener.Accept()
+		log.Debug("Connection made")
 
 		if err != nil {
 			panic("failed to accept incoming connection")
@@ -159,7 +164,8 @@ func processPush(conn ssh.Channel, sshOriginalCommand, repositoryRootPath string
 			return err
 		}
 
-		if err := createReceiveHook(repoPath); err != nil {
+		config := config.Current()
+		if err := createReceiveHook(repoPath, config.Domain); err != nil {
 			return err
 		}
 	}
@@ -212,7 +218,7 @@ func generateRSAPrivateKey() ([]byte, error) {
 	return pem.EncodeToMemory(&priv_blk), nil
 }
 
-func createReceiveHook(repoPath string) error {
+func createReceiveHook(repoPath, domain string) error {
 	finalHookPath := filepath.Join(repoPath, prereceiveHookPath)
 	fh, err := os.OpenFile(finalHookPath, os.O_CREATE|os.O_RDWR, 7550)
 
@@ -223,7 +229,7 @@ func createReceiveHook(repoPath string) error {
 
 	defer fh.Close()
 
-	prereceiveScript := fmt.Sprintf(prereceiveHookTemplate, repoPath)
+	prereceiveScript := fmt.Sprintf(prereceiveHookTemplate, domain, repoPath)
 
 	if _, err := fh.WriteString(prereceiveScript); err != nil {
 		return err

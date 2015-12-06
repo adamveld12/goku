@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-func Compose(proj repository) error {
+func createApp(proj repository) error {
 	fmt.Println("Docker compose detected... @", proj.TargetFilePath)
 	dockCompose := exec.Command("/bin/docker-compose", "up", "--force-recreate")
 

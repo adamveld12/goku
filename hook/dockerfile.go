@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/adamveld12/goku/config"
 	"github.com/adamveld12/goku/log"
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -35,6 +36,43 @@ type repository struct {
 type projectType string
 
 type buildFunc func(repo repository) error
+
+func createContainer(proj repository) error {
+	fmt.Println("Dockerfile detected @", proj.TargetFilePath)
+
+	config := config.Current()
+	endpoint := fmt.Sprintf("unix://%s", config.DockerSock)
+	client, err := docker.NewClient(endpoint)
+	if err != nil {
+		log.DebugErr(err)
+		return err
+	}
+
+	if err := cleanDuplicateContainer(client, proj.Name); err != nil {
+		log.DebugErr(err)
+		return err
+	}
+
+	if err := buildImage(client, proj.Name, *proj.Archive); err != nil {
+		log.Debugf("could not build image\n%s", err)
+		return err
+	}
+
+	container, err := launchContainer(client, proj.Name)
+	if err != nil {
+		log.Debugf("could not launch container\n%s", err.Error())
+		return err
+	}
+
+	if err := publish(proj, container); err != nil {
+		log.Debugf("could not publish site\n%s", err.Error())
+		return err
+	}
+
+	fmt.Println(container.ID)
+
+	return nil
+}
 
 func cleanDuplicateContainer(client *docker.Client, name string) error {
 
@@ -111,40 +149,4 @@ func launchContainer(client *docker.Client, name string) (*docker.Container, err
 	}
 
 	return client.InspectContainer(container.ID)
-}
-
-func Container(proj repository) error {
-	fmt.Println("Dockerfile detected @", proj.TargetFilePath)
-
-	endpoint := fmt.Sprintf("unix://%s", "/var/run/docker.sock")
-	client, err := docker.NewClient(endpoint)
-	if err != nil {
-		log.DebugErr(err)
-		return err
-	}
-
-	if err := cleanDuplicateContainer(client, proj.Name); err != nil {
-		log.DebugErr(err)
-		return err
-	}
-
-	if err := buildImage(client, proj.Name, *proj.Archive); err != nil {
-		log.Debugf("could not build image\n%s", err)
-		return err
-	}
-
-	container, err := launchContainer(client, proj.Name)
-	if err != nil {
-		log.Debugf("could not launch container\n%s", err.Error())
-		return err
-	}
-
-	if err := publish(proj, container); err != nil {
-		log.Debugf("could not publish site\n%s", err.Error())
-		return err
-	}
-
-	fmt.Println(container.ID)
-
-	return nil
 }

@@ -24,9 +24,7 @@ func main() {
 	}
 }
 
-func genConfig(path string) {
-
-}
+func genConfig(path string) {}
 
 func serverMode() {
 	// go dashboardListen(*dashboardHost)

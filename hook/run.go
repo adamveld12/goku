@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/adamveld12/goku/config"
 )
 
 func Run(path string) {
@@ -27,7 +29,10 @@ func Run(path string) {
 		os.Exit(128)
 	}
 
-	proj, err := checkout(archiveReader, path, branch)
+	config.Initialize()
+
+	config := config.Current()
+	proj, err := checkout(archiveReader, path, branch, config.Domain)
 
 	builder, err := detectProjectType(proj.Type)
 	if err != nil {
@@ -46,9 +51,9 @@ func detectProjectType(projType projectType) (buildFunc, error) {
 	var builder buildFunc
 
 	if projType == Composefile {
-		builder = Compose
+		builder = createApp
 	} else if projType == Dockerfile {
-		builder = Container
+		builder = createContainer
 	} else {
 		return nil, errors.New("Nothing to build")
 	}

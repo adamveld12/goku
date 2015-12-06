@@ -18,21 +18,22 @@ const (
 
 var (
 	config  = DefaultConfig()
-	ip      = "0.0.0.0"
+	ip      = "127.0.0.1"
 	backend Backend
 
 	rawBackendType = flag.String("backend", "file", "specify a backend to use")
-	configPath     = flag.String("config", "", "path to a config.json")
+	configPath     = flag.String("config", "", "path to a config.json or url consul server")
 	gitPath        = flag.String("gitpath", "repositories", "the path where remote repositories are pushed")
-	sshHost        = flag.String("ssh", "0.0.0.0:22", "ssh host and port")
-	dashboardPort  = flag.String("dashboard", "0.0.0.0:80", "dashboard host and port")
+	domainAddr     = flag.String("domain", "xip.io", "domain name")
+	dockerSock     = flag.String("dockersock", "/var/run/docker.sock", "the url to a docker daemon")
+	sshHost        = flag.String("ssh", ":22", "ssh host and port")
+	dashboardHost  = flag.String("dashboard", ":80", "dashboard host and port")
 	debug          = flag.Bool("debug", false, "enable debug mode")
 )
 
 func init() {
 	req, _ := http.NewRequest("GET", "http://ipv4.icanhazip.com/", bytes.NewBuffer([]byte{}))
 
-	ip = "127.0.0.1"
 	if res, err := http.DefaultClient.Do(req); err == nil {
 		body, _ := ioutil.ReadAll(res.Body)
 		ip = string(body)
@@ -56,6 +57,14 @@ func Debug() bool {
 
 func Initialize() []string {
 	flag.Parse()
+	if *debug {
+		ip = "127.0.0.1"
+	}
+
+	if *domainAddr == "xip.io" {
+		*domainAddr = fmt.Sprintf("%s.xip.io", ip)
+	}
+
 	backendType := BackendType(*rawBackendType)
 
 	var loader BackendLoader
@@ -105,9 +114,6 @@ type Backend interface {
 
 // Configuration contains all of the configuration info used by Goku
 type Configuration struct {
-	// PublicIp is the public facing ip of this server
-	PublicIp string `json:"public_ip"`
-
 	// Domain is the domain name to use for services
 	Domain string `json:"domain"`
 
@@ -141,15 +147,15 @@ func (c Configuration) String() string {
 
 // DefaultConfig creates a new configuration with sane defaults
 func DefaultConfig() Configuration {
+
 	return Configuration{
-		PublicIp:          ip,
-		Domain:            fmt.Sprintf("%s.xip.io", ip),
-		AdminHost:         "0.0.0.0:80",
-		GitHost:           "0.0.0.0:22",
-		GitPath:           "./repositories",
+		Domain:            *domainAddr,
+		AdminHost:         *dashboardHost,
+		GitHost:           *sshHost,
+		GitPath:           *gitPath,
 		NotificationEmail: "sysadmin@example.com",
 		PrivateRegistry:   "",
-		DockerSock:        "/var/run/docker.sock",
+		DockerSock:        *dockerSock,
 	}
 }
 
