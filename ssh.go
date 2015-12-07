@@ -25,7 +25,13 @@ import (
 const (
 	prereceiveHookTemplate = `#!/bin/bash
 go run $GOPATH/src/github.com/adamveld12/goku/*.go -debug -domain "%s" hook %s`
-	prereceiveHookPath = `hooks/pre-receive`
+	prereceiveHookPath       = `hooks/pre-receive`
+	gitShellCommandErrScript = `#!/bin/sh
+echo "Cannot push $REPO_NAME"
+echo "$ERROR_MSG"
+exit 128
+`
+	gitShellCommandErrPath = "~/git-shell-commands/no-interactive-login"
 )
 
 func fingerprint(pubkey ssh.PublicKey) string {
@@ -45,13 +51,7 @@ func fingerprint(pubkey ssh.PublicKey) string {
 func gitListen() {
 	config := config.Current()
 
-	gitPath := config.GitPath
-	if _, err := os.Stat(gitPath); err != nil {
-		log.Debugf("creating repository directory at \"%s\"", gitPath)
-		if err = os.MkdirAll(gitPath, os.ModeDir); err != nil {
-			log.Fatal(fmt.Sprintf("cannot create directory for git repositories at %s", gitPath))
-		}
-	}
+	initGitServer(config.GitPath)
 
 	serverConfig := ssh.ServerConfig{
 		PublicKeyCallback: func(connMeta ssh.ConnMetadata, key ssh.PublicKey) (permissions *ssh.Permissions, err error) {
@@ -92,12 +92,25 @@ func gitListen() {
 			panic("failed to accept incoming connection")
 		}
 
-		go serveSSHConn(nConn, &serverConfig, gitPath)
+		go handleSSHConn(nConn, &serverConfig, config.GitPath)
 	}
 
 }
 
-func serveSSHConn(nConn net.Conn, serverConfig *ssh.ServerConfig, gitPath string) {
+func initGitServer(gitPath string) {
+	// setup repo directory
+	if _, err := os.Stat(gitPath); os.IsNotExist(err) {
+		log.Debugf("creating repository directory at \"%s\"", gitPath)
+		if err = os.MkdirAll(gitPath, os.ModeDir); err != nil {
+			log.Fatal(fmt.Sprintf("cannot create directory for git repositories at %s", gitPath))
+		}
+	}
+
+	// investigate setting up https://git-scm.com/docs/git-shell
+	// to show validation messages
+}
+
+func handleSSHConn(nConn net.Conn, serverConfig *ssh.ServerConfig, gitPath string) {
 	_, newChans, reqChan, err := ssh.NewServerConn(nConn, serverConfig)
 
 	if err != nil && err != io.EOF {
@@ -149,8 +162,8 @@ func processPush(conn ssh.Channel, sshOriginalCommand, repositoryRootPath string
 
 	tokens := strings.Split(sshOriginalCommand, " ")
 	tokenLen := len(tokens)
-
 	repoName := strings.Trim(tokens[tokenLen-1], "'")
+
 	repoPath := filepath.Join(repositoryRootPath, repoName)
 
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
@@ -170,12 +183,38 @@ func processPush(conn ssh.Channel, sshOriginalCommand, repositoryRootPath string
 		}
 	}
 
+	if !isValidRepoName(repoName) {
+		return errors.New("repository name must end with \".git\" and cannot be an empty string")
+	}
+
+	return runGitRecievePack(conn, conn.Stderr(), repoPath)
+}
+
+func runGitReceiveErr(inout io.ReadWriter, err io.Writer, repoPath, message string) error {
+	os.Setenv("SSH_ORIGINAL_COMMAND", fmt.Sprintf("git-receive-pack '%s'", repoPath))
+	os.Setenv("REPO_NAME", repoPath)
+	os.Setenv("ERROR_MSG", message)
+	cmd := exec.Command("git-shell")
+
+	cmd.Stdin = inout
+	cmd.Stderr = io.MultiWriter(err, os.Stderr)
+	cmd.Stdout = inout
+
+	if err := cmd.Run(); err != nil {
+		log.Errorf("git-shell interactive failed %s", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func runGitRecievePack(inout io.ReadWriter, err io.Writer, repoPath string) error {
 	os.Setenv("SSH_ORIGINAL_COMMAND", fmt.Sprintf("git-receive-pack '%s'", repoPath))
 	cmd := exec.Command("git-shell", "-c", fmt.Sprintf("git-receive-pack '%s'", repoPath))
 
-	cmd.Stdin = conn
-	cmd.Stderr = io.MultiWriter(conn.Stderr(), os.Stderr)
-	cmd.Stdout = conn
+	cmd.Stdin = inout
+	cmd.Stderr = io.MultiWriter(err, os.Stderr)
+	cmd.Stdout = inout
 
 	if err := cmd.Run(); err != nil {
 		log.Errorf("receive pack failed %s", err.Error())
@@ -216,6 +255,10 @@ func generateRSAPrivateKey() ([]byte, error) {
 	}
 
 	return pem.EncodeToMemory(&priv_blk), nil
+}
+
+func isValidRepoName(repoName string) bool {
+	return strings.HasSuffix(repoName, ".git") && strings.Trim(repoName, " ") != ""
 }
 
 func createReceiveHook(repoPath, domain string) error {
