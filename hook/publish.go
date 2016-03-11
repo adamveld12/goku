@@ -69,13 +69,8 @@ func saveNginxProfile(domain, name, port string) error {
 	}
 
 	reloadCmd := exec.Command("service", "nginx", "reload")
-	if err := reloadCmd.Start(); err != nil {
-		log.Debugf("could not start nginx reload\n%s", err.Error())
-		return err
-	}
-
-	if err := reloadCmd.Wait(); err != nil {
-		log.Debugf("nginx reload failed\n%s", err.Error())
+	if err := reloadCmd.Run(); err != nil {
+		log.Debugf("could not reload nginx profile\n%s", err.Error())
 		return err
 	}
 

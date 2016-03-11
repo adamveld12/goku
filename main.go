@@ -28,5 +28,5 @@ func genConfig(path string) {}
 
 func serverMode() {
 	// go dashboardListen(*dashboardHost)
-	gitListen()
+	Listen()
 }

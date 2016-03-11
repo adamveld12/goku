@@ -48,7 +48,7 @@ func fingerprint(pubkey ssh.PublicKey) string {
 
 }
 
-func gitListen() {
+func Listen() {
 	config := config.Current()
 
 	initGitServer(config.GitPath)
