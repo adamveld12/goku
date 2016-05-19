@@ -7,6 +7,9 @@ dev: build
 build: clean
 	go build .
 
+install:
+	go get
+
 clean:
 	rm -rf ./goku
 	rm -rf ./repositories
