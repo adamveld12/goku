@@ -3,30 +3,30 @@ package main
 import (
 	"os"
 
-	"github.com/adamveld12/commando"
 	"github.com/adamveld12/goku/config"
-	"github.com/adamveld12/goku/hook"
 	"github.com/adamveld12/goku/log"
+
+	"github.com/adamveld12/goku/server"
+	"github.com/mitchellh/cli"
 )
 
 func main() {
-	args := config.Initialize()
-
+	config.Initialize(os.Args[2:])
 	log.Initialize(config.Debug(), os.Stderr)
 
-	app := commando.New()
+	c := cli.NewCLI("goku", "1.0.0")
+	c.Args = os.Args[1:]
 
-	app.Add("generate-config", "generates a commented config.json with sane defaults at the specified location", genConfig)
-	app.Add("hook build", "builds a repository from the specified path", hook.Run)
-
-	if err := app.Execute(args...); err != nil {
-		serverMode()
+	c.Commands = map[string]cli.CommandFactory{
+		"server": server.Command,
+		//"keys":   keys.Command,
+		//"hook": hook.Command(),
 	}
-}
 
-func genConfig(path string) {}
+	exitStatus, err := c.Run()
+	if err != nil {
+		log.Println(err.Error())
+	}
 
-func serverMode() {
-	// go dashboardListen(*dashboardHost)
-	Listen()
+	os.Exit(exitStatus)
 }

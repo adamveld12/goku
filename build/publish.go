@@ -1,4 +1,4 @@
-package hook
+package build
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ server {
 `
 
 // publish publishes a container via nginx
-func publish(proj repository, container *docker.Container) error {
+func publish(proj Project, container *docker.Container) error {
 
 	ports := container.NetworkSettings.Ports
 

@@ -1,7 +1,8 @@
-package hook
+package build
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -11,11 +12,42 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 )
 
-const (
-	Composefile = projectType("docker-compose.yml")
-	Dockerfile  = projectType("Dockerfile")
-	None        = projectType("None")
-)
+type dockerfileBuilder struct{}
+
+func (dfb dockerfileBuilder) IsMatch(filename string) bool {
+	return filename == "Dockerfile"
+}
+
+func (dfb dockerfileBuilder) Build(proj Project, endpoint string) (string, error) {
+	fmt.Println("Dockerfile detected @", proj.TargetFilePath)
+
+	config := config.Current()
+	endpoint = config.DockerSock
+	client, err := docker.NewClient(endpoint)
+	if err != nil {
+		log.DebugErr(err)
+		return "", err
+	}
+
+	if err := cleanDuplicateContainer(client, proj.Name); err != nil {
+		log.DebugErr(err)
+		return "", err
+	}
+
+	if err := buildImage(client, proj.Name, *proj.Archive); err != nil {
+		log.Debugf("could not build image\n%s", err)
+		return "", err
+	}
+
+	container, err := launchContainer(client, proj.Name)
+	if err != nil {
+		log.Debugf("could not launch container\n%s", err.Error())
+		return "", err
+	}
+
+	fmt.Println(container.ID, ":", container.Name)
+	return container.ID, nil
+}
 
 type container struct {
 	Name  string
@@ -23,54 +55,10 @@ type container struct {
 	ID    string
 }
 
-type repository struct {
-	Type           projectType
-	Files          []string
-	Domain         string
-	TargetFilePath string
-	Name           string
-	Branch         string
-	Archive        *[]byte
-}
-
-type projectType string
-
-type buildFunc func(repo repository) error
-
-func createContainer(proj repository) error {
-	fmt.Println("Dockerfile detected @", proj.TargetFilePath)
-
-	config := config.Current()
-	endpoint := fmt.Sprintf("unix://%s", config.DockerSock)
-	client, err := docker.NewClient(endpoint)
-	if err != nil {
-		log.DebugErr(err)
-		return err
+func killContainer(client *docker.Client, containerID string) error {
+	if err := client.KillContainer(docker.KillContainerOptions{ID: containerID}); err != nil {
+		return errors.New("Could not kill container")
 	}
-
-	if err := cleanDuplicateContainer(client, proj.Name); err != nil {
-		log.DebugErr(err)
-		return err
-	}
-
-	if err := buildImage(client, proj.Name, *proj.Archive); err != nil {
-		log.Debugf("could not build image\n%s", err)
-		return err
-	}
-
-	container, err := launchContainer(client, proj.Name)
-	if err != nil {
-		log.Debugf("could not launch container\n%s", err.Error())
-		return err
-	}
-
-	if err := publish(proj, container); err != nil {
-		log.Debugf("could not publish site\n%s", err.Error())
-		return err
-	}
-
-	fmt.Println(container.ID)
-
 	return nil
 }
 
@@ -134,8 +122,10 @@ func launchContainer(client *docker.Client, name string) (*docker.Container, err
 
 	targetImageId := images[0].ID
 	container, err := client.CreateContainer(docker.CreateContainerOptions{
-		Name:   name,
-		Config: &docker.Config{Image: targetImageId},
+		Name: name,
+		Config: &docker.Config{
+			Image: targetImageId,
+		},
 	})
 
 	if err != nil {

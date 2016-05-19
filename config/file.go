@@ -4,128 +4,117 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
-
-	"github.com/adamveld12/goku/log"
-
-	"github.com/fatih/color"
-)
-
-const (
-	usersFilepath = "./users.json"
 )
 
 var (
-	ErrNoUserFound              = errors.New("no users found")
-	ErrConfigFileNotFound       = errors.New("Configuration file at the specified path does not exist")
-	ErrConfigFileCouldNotBeRead = errors.New("Configuration file at the specified path could not be read")
+	UnableToSaveConfigErr = errors.New("Unable to save configuration file")
+	UnableToLoadConfigErr = errors.New("Unable to load configuration file")
+	UnableToFlushKeysErr  = errors.New("Unable to write public keys to file")
 )
 
-func FileBackendLoader(path string) (Backend, error) {
-	return &fileBackend{Mutex: sync.Mutex{}, filepath: path, users: []User{}}, nil
+func FileBackendFactory(path string) (Backend, error) {
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+		return nil, errors.New(fmt.Sprintf("Could not create data dir at path %s", path))
+	}
+
+	fs, err := os.Open(path + "/keys.json")
+	fb := fileBackend{
+		directory: path,
+	}
+
+	if err != nil && os.IsNotExist(err) {
+		return fb, fb.flushKeys()
+	}
+	defer fs.Close()
+
+	decoder := json.NewDecoder(fs)
+	if err := decoder.Decode(&fb); err != nil {
+		return nil, err
+	}
+
+	return fb, nil
 }
 
 type fileBackend struct {
 	sync.Mutex
-	filepath string
-	users    []User `json:"users"`
+	directory string               `json:"directory"`
+	keys      map[string]PublicKey `json:"keys"`
 }
 
-func (j *fileBackend) SaveConfig(config Configuration) error {
-	return ioutil.WriteFile(j.filepath, []byte(config.String()), 0)
-}
-
-func (j *fileBackend) LoadConfig() (Configuration, error) {
-
-	if _, err := os.Stat(j.filepath); os.IsNotExist(err) {
-		log.Debug("config file not found, continuing with default")
-		return DefaultConfig(), nil
-	}
-
-	data, err := ioutil.ReadFile(j.filepath)
-
-	if err != nil && os.IsExist(err) {
-		color.Red("could not read config file from location %s\n%s", j.filepath, err.Error())
-		return DefaultConfig(), ErrConfigFileCouldNotBeRead
-	}
-
-	config := DefaultConfig()
-	if err := json.Unmarshal(data, &config); err != nil {
-		log.Fatal(fmt.Sprintf("an error occured while parsing config file at %s\n%s", j.filepath, err.Error()))
-		return DefaultConfig(), ErrConfigFileCouldNotBeRead
-	}
-
-	return config, err
-}
-
-func (f *fileBackend) flush() error {
-	f.Lock()
-	defer f.Unlock()
-	data, err := json.Marshal(f.users)
+func (f fileBackend) LoadConfig(filepath string) (Configuration, error) {
+	fs, err := os.Open(filepath)
 	if err != nil {
-		return err
+		return Configuration{}, UnableToLoadConfigErr
+	}
+	defer fs.Close()
+
+	decoder := json.NewDecoder(fs)
+
+	configFile := Configuration{}
+	if err := decoder.Decode(&configFile); err != nil {
+		return Configuration{}, UnableToLoadConfigErr
 	}
 
-	return ioutil.WriteFile(f.filepath, data, 0)
-
+	return configFile, nil
 }
 
-func (f *fileBackend) Users() ([]User, error) {
-	f.Lock()
-	defer f.Unlock()
+func (f fileBackend) Keys() ([]PublicKey, error) {
+	pks := []PublicKey{}
+	for _, v := range f.keys {
+		pks = append(pks, v)
+	}
 
-	return f.users, nil
+	return pks, nil
 }
 
-func (f *fileBackend) SaveUser(u User) error {
+func (f fileBackend) AddKey(key PublicKey) error {
 	f.Lock()
 	defer f.Unlock()
+	f.keys[key.Fingerprint] = key
 
-	f.users = append(f.users, u)
-
-	go f.flush()
+	if err := f.flushKeys(); err != nil {
+		return UnableToFlushKeysErr
+	}
 
 	return nil
 }
 
-func (f *fileBackend) FindUser(fingerprint string) (User, error) {
-	f.Lock()
-	defer f.Unlock()
+func (f fileBackend) GetKey(fingerprint string) (PublicKey, error) {
+	pk, ok := f.keys[fingerprint]
 
-	if len(f.users) == 0 {
-		data, err := ioutil.ReadFile(f.filepath)
-		if err != nil {
-			return User{}, err
-		}
-
-		if err := json.Unmarshal(data, f.users); err != nil {
-			return User{}, err
-		}
+	if !ok {
+		return PublicKey{}, PublicKeyNotFoundErr
 	}
 
-	for _, u := range f.users {
-		if u.Fingerprint == fingerprint {
-			return u, nil
-		}
-	}
-
-	return User{}, ErrNoUserFound
+	return pk, nil
 }
 
-func (f *fileBackend) DeleteUser(fingerprint string) error {
+func (f fileBackend) DeleteKey(fingerprint string) error {
 	f.Lock()
 	defer f.Unlock()
+	delete(f.keys, fingerprint)
 
-	for idx, u := range f.users {
-		if fingerprint == u.Fingerprint {
-			f.users = append(f.users[:idx], f.users[idx+1:]...)
-			return nil
-		}
+	if err := f.flushKeys(); err != nil {
+		return UnableToFlushKeysErr
 	}
 
-	go f.flush()
+	return nil
+}
 
-	return ErrNoUserFound
+func (f fileBackend) flushKeys() error {
+	fs, err := os.OpenFile(f.directory+"/keys.json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	defer fs.Close()
+
+	encoder := json.NewEncoder(fs)
+	if err := encoder.Encode(f); err != nil {
+		return err
+	}
+
+	return nil
 }

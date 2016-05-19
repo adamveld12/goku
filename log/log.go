@@ -14,10 +14,10 @@ const (
 	WarnFilter  = "WARN"
 	DebugFilter = "DEBUG"
 	FatalFilter = "FATAL"
-)
 
-const debugMinLevel = logutils.LogLevel("DEBUG")
-const releaseMinLevel = logutils.LogLevel("WARN")
+	debugMinLevel   = logutils.LogLevel(DebugFilter)
+	releaseMinLevel = logutils.LogLevel(WarnFilter)
+)
 
 // InitLogging initializes logging levels
 func Initialize(debugMode bool, output io.Writer) {
@@ -35,6 +35,24 @@ func Initialize(debugMode bool, output io.Writer) {
 	}
 
 	log.SetOutput(filter)
+}
+
+func printLog(logType, fmtString string, arguments ...interface{}) {
+	colorFunc := color.BlueString
+
+	if logType == ErrorFilter {
+		colorFunc = color.RedString
+	} else if logType == DebugFilter {
+		colorFunc = color.GreenString
+	} else if logType == WarnFilter {
+		colorFunc = color.YellowString
+	} else if logType == FatalFilter {
+		colorFunc = color.MagentaString
+	} else {
+		logType = "INFO"
+	}
+
+	log.Println(fmt.Sprintf("[%s] %s", logType, colorFunc(fmtString, arguments...)))
 }
 
 func Println(m string) {
@@ -91,22 +109,4 @@ func Warn(output string) {
 
 func Warnf(fmtString string, arguments ...interface{}) {
 	printLog(WarnFilter, fmtString, arguments...)
-}
-
-func printLog(logType, fmtString string, arguments ...interface{}) {
-	colorFunc := color.BlueString
-
-	if logType == ErrorFilter {
-		colorFunc = color.RedString
-	} else if logType == DebugFilter {
-		colorFunc = color.GreenString
-	} else if logType == WarnFilter {
-		colorFunc = color.YellowString
-	} else if logType == FatalFilter {
-		colorFunc = color.MagentaString
-	} else {
-		logType = "INFO"
-	}
-
-	log.Println(fmt.Sprintf("[%s] %s", logType, colorFunc(fmtString, arguments...)))
 }

@@ -5,18 +5,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/adamveld12/goku/log"
 	"github.com/hashicorp/consul/api"
 )
 
 const (
-	configKeyPrefix = "goku/configuration"
-	userKeyPrefix   = "goku/users"
+	gokuPrefix      = "goku"
+	configKeyPrefix = gokuPrefix + "/configuration/"
+	pubKeyPrefix    = gokuPrefix + "/data/keys/"
 )
 
-type consulBackend struct{ *api.Client }
-
-// ConsulBackendLoader loads the consul backend storage
-func ConsulBackendLoader(uri string) (Backend, error) {
+func ConsulBackendFactory(url string) (Backend, error) {
 	client, err := api.NewClient(api.DefaultConfig())
 
 	if err != nil {
@@ -26,31 +25,25 @@ func ConsulBackendLoader(uri string) (Backend, error) {
 	return consulBackend{client}, nil
 }
 
-func (c consulBackend) LoadConfig() (Configuration, error) {
+type consulBackend struct{ *api.Client }
+
+func (c consulBackend) LoadConfig(path string) (Configuration, error) {
 	kv := c.KV()
 
 	pair, _, err := kv.Get(configKeyPrefix, nil)
 
+	var configFile Configuration
 	if err != nil {
-		config := DefaultConfig()
-		configBytes, err := json.Marshal(config)
-
-		if err != nil {
-			panic("could not serialize default configuration")
-			return Configuration{}, err
+		configFile = DefaultConfig()
+		if err := c.SaveConfig(configFile); err != nil {
+			panic("could not write default values to consul")
 		}
-
-		if _, err := kv.Put(&api.KVPair{Key: configKeyPrefix, Value: configBytes}, nil); err != nil {
-			panic(fmt.Sprintf("could not write default config to consul\n%s\n", err.Error()))
-			return Configuration{}, err
-		}
-	}
-
-	if err := json.Unmarshal(pair.Value, &config); err != nil {
+	} else if err := json.Unmarshal(pair.Value, &configFile); err != nil {
 		panic("could not deserialize configuration data from consul")
 		return Configuration{}, err
 	}
-	return config, nil
+
+	return configFile, nil
 }
 
 func (c consulBackend) SaveConfig(config Configuration) error {
@@ -58,28 +51,30 @@ func (c consulBackend) SaveConfig(config Configuration) error {
 
 	configBytes, err := json.Marshal(&config)
 	if err != nil {
-		return err
+		log.Err(err)
+		return errors.New("could not serialize config file to json")
 	}
 
 	if _, err := kv.Put(&api.KVPair{Key: configKeyPrefix, Value: configBytes}, nil); err != nil {
-		return err
+		log.Err(err)
+		return errors.New("could not save config file to consul")
 	}
 
 	return nil
 }
 
-func (c consulBackend) Users() ([]User, error) {
+func (c consulBackend) Keys() ([]PublicKey, error) {
 	kv := c.KV()
 
-	pairs, _, err := kv.List(fmt.Sprintf("%s*", userKeyPrefix), &api.QueryOptions{RequireConsistent: true})
+	pairs, _, err := kv.List(fmt.Sprintf("%s*", pubKeyPrefix), &api.QueryOptions{RequireConsistent: true})
 	if err != nil {
 		return nil, err
 	}
 
-	users := []User{}
+	users := []PublicKey{}
 
 	for _, pair := range pairs {
-		user := User{}
+		user := PublicKey{}
 		if err := json.Unmarshal(pair.Value, &user); err != nil {
 			return nil, err
 		}
@@ -90,17 +85,16 @@ func (c consulBackend) Users() ([]User, error) {
 	return users, nil
 }
 
-func (c consulBackend) SaveUser(u User) error {
+func (c consulBackend) AddKey(key PublicKey) error {
 	kv := c.KV()
 
-	userKey := fmt.Sprintf("%s%s", userKeyPrefix, u.Fingerprint)
-
-	userJsonBytes, err := json.Marshal(u)
+	keyjson, err := json.Marshal(key)
 	if err != nil {
 		return err
 	}
 
-	p := &api.KVPair{Key: userKey, Value: userJsonBytes}
+	pkKey := fmt.Sprintf("%s%s", pubKeyPrefix, key.Fingerprint)
+	p := &api.KVPair{Key: pkKey, Value: keyjson}
 	if _, err := kv.Put(p, nil); err != nil {
 		return err
 	}
@@ -108,44 +102,35 @@ func (c consulBackend) SaveUser(u User) error {
 	return nil
 }
 
-func (c consulBackend) DeleteUser(fingerprint string) error {
+func (c consulBackend) DeleteKey(fingerprint string) error {
 	kv := c.KV()
 
-	userKey := fmt.Sprintf("%s%s", userKeyPrefix, fingerprint)
+	pkKey := fmt.Sprintf("%s%s", pubKeyPrefix, fingerprint)
 
-	pair, _, err := kv.Get(userKey, nil)
-	if pair == nil {
-		return errors.New(fmt.Sprintf("A user \"%s\" does not exist.", fingerprint))
-	}
-
-	if err != nil {
-		return err
-	}
-
-	if _, err := kv.Delete(userKey, nil); err != nil {
+	if _, err := kv.Delete(pkKey, nil); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c consulBackend) FindUser(fingerprint string) (User, error) {
+func (c consulBackend) GetKey(fingerprint string) (PublicKey, error) {
 	kv := c.KV()
-	userKey := fmt.Sprintf("%s%s", userKeyPrefix, fingerprint)
+	pkKey := fmt.Sprintf("%s%s", pubKeyPrefix, fingerprint)
 
-	pair, _, err := kv.Get(userKey, nil)
+	pair, _, err := kv.Get(pkKey, nil)
 	if pair == nil {
-		return User{}, ErrNoUserFound
+		return PublicKey{}, PublicKeyNotFoundErr
 	}
 
 	if err != nil {
-		return User{}, err
+		return PublicKey{}, err
 	}
 
-	user := User{}
-	if err := json.Unmarshal(pair.Value, &user); err != nil {
-		return User{}, err
+	pk := PublicKey{}
+	if err := json.Unmarshal(pair.Value, &pk); err != nil {
+		return PublicKey{}, err
 	}
 
-	return user, nil
+	return pk, nil
 }
