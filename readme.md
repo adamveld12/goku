@@ -1,5 +1,7 @@
 # Goku
 
+[![Build Status](https://drone.io/github.com/adamveld12/goku/status.png)](https://drone.io/github.com/adamveld12/goku/latest) [![GoDoc](https://godoc.org/github.com/adamveld12/goku?status.svg)](http://godoc.org/github.com/adamvel12/goku) [![Go Report Card](https://goreportcard.com/badge/adamveld12/goku)](https://goreportcard.com/report/adamveld12/goku)
+
 A small, easy to install, easy to manage PaaS for hobbyists.
 
 ## Installing
@@ -20,20 +22,20 @@ Goku can be configured by a .json file that can be loaded like so:
 
 `goku server -config /path/to/config.json`
 
-or run with a Consul backend:
-
-`goku server -config http(s)://url.to.consul`
-
 The config file (with the system defaults) is detailed below:
 
 ```js
 {
-  "ssh": "0.0.0.0:22", // The interface:port that the ssh server listens on
+  "http": "0.0.0.0:80", // The interface:port that the http server listens on
   "rpc": "127.0.0.1:5127",  // The rpc host:port for the goku CLI tool
   // "rpc": { "ip": "127.0.0.1:5127", "cert": "/path/to/cert.pfx" }, // alternatively provide an object with an ip and a certificate location
   // "rpc": [ "127.0.0.1:5127" ],  // alternatively provide an array of ip's for RPC to bind to
   // "rpc": [ { "ip": "127.0.0.1:5127", "cert": "/path/to/cert.pfx" } ], // alternatively provide an array of ips with certificates
-  "hostname": "xip.io" // the name used access active services running in goku (myapp.exmaple.com)
+  "backend": {
+    "type": "file", // the storage backend type, consul and file are currently supported
+    "path": "./data/goku" // the path to storage
+  },
+  "hostname": "xip.io" // the root domain name used access active services running in goku
   "masterOnly": false, // if true, only accepts pushes to master branch
   "gitpath": "/tmp/path/to/repos", // the temp file path where the bare git repositories are stored
   "dockersock": "/var/run/docker.sock", // the docker daemon endpoint
@@ -72,11 +74,11 @@ By default the client runs against "127.0.0.1:5127", so for most cases no setup 
 
 `goku app logs <id> -tail -prefix`: prints logs for an app. Optionally enable real time tailing or prefix each statement with the app name
 
-`goku keys add <name> <sshkey>`: add an SSH public key
+`goku user add <name> <password>`: add a user
 
-`goku keys list`: lists the public keys added
+`goku user list`: lists the users
 
-`goku keys rm <name>` : removes a public key
+`goku user rm <name>` : removes a user
 
 `goku git clear`: wipes all of the bare git repositories
 
@@ -94,7 +96,6 @@ Make sure you have Vagrant installed and then:
 
 1. `vagrant up`
 2. :sunglasses:
-
 
 ## License
 

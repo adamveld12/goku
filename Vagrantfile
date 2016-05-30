@@ -4,19 +4,18 @@
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/trusty64"
 
-  # SSH
-  config.vm.network "forwarded_port", guest: 2222, host: 2223
   # NGINX
   config.vm.network "forwarded_port", guest: 80, host: 3000
+
+  # GIT PUSH
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
+
+  # RPC
+  config.vm.network "forwarded_port", guest: 5127, host: 5127
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
   config.vm.network "public_network", ip: "192.168.99.100"
-
-  # Create a public network, which generally matched to bridged network.
-  # Bridged networks make the machine appear as another physical device on
-  # your network.
-  #config.vm.network "public_network"
 
   config.vm.synced_folder "", "/go/src/github.com/adamveld12/goku"
 
@@ -36,13 +35,11 @@ Vagrant.configure(2) do |config|
                              linux-image-generic-lts-trusty \
                              linux-image-extra-$(uname -r) \
                              docker-engine;
-     rm -rf /vagrant_data;
-
     curl -L https://github.com/docker/compose/releases/download/1.6.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose;
     chmod +x /usr/local/bin/docker-compose;
 
      cd /usr/local/bin/;
-     curl -s https://storage.googleapis.com/golang/go1.5.1.linux-amd64.tar.gz | tar zx;
+     curl -s https://storage.googleapis.com/golang/go1.6.2.linux-amd64.tar.gz | tar zx;
      sudo cat > /home/vagrant/.bashrc <<RC
      export GOPATH=/go
      export GOROOT=/usr/local/bin/go
@@ -52,5 +49,8 @@ RC
      sudo usermod -aG docker vagrant;
      sudo chown -R vagrant /go;
      sudo chown -R vagrant /etc/nginx;
+
+     go get github.com/adamveld12/goku
+
 SHELL
 end

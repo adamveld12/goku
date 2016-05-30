@@ -1,11 +1,10 @@
-package config
+package store
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/adamveld12/goku/log"
+	. "github.com/adamveld12/goku"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -15,18 +14,33 @@ const (
 	pubKeyPrefix    = gokuPrefix + "/data/keys/"
 )
 
-func ConsulBackendFactory(url string) (Backend, error) {
+func init() {
+	RegisterBackend("consul", consulBackendFactory)
+}
+
+func consulBackendFactory(url string) (Backend, error) {
 	client, err := api.NewClient(api.DefaultConfig())
 
 	if err != nil {
 		return nil, errors.New("failed to initialize consul API")
 	}
 
-	return consulBackend{client}, nil
+	return consulBackend{
+		client,
+		NewLog("[consul store]", true),
+	}, nil
 }
 
-type consulBackend struct{ *api.Client }
+type consulBackend struct {
+	*api.Client
+	l Log
+}
 
+func (c consulBackend) Close() error {
+	return c.Close()
+}
+
+/*
 func (c consulBackend) LoadConfig(path string) (Configuration, error) {
 	kv := c.KV()
 
@@ -62,39 +76,28 @@ func (c consulBackend) SaveConfig(config Configuration) error {
 
 	return nil
 }
+*/
 
-func (c consulBackend) Keys() ([]PublicKey, error) {
+func (c consulBackend) GetList(key string) ([][]byte, error) {
 	kv := c.KV()
 
-	pairs, _, err := kv.List(fmt.Sprintf("%s*", pubKeyPrefix), &api.QueryOptions{RequireConsistent: true})
+	pairs, _, err := kv.List(fmt.Sprintf("%s*", key), &api.QueryOptions{RequireConsistent: true})
 	if err != nil {
 		return nil, err
 	}
 
-	users := []PublicKey{}
-
+	data := [][]byte{}
 	for _, pair := range pairs {
-		user := PublicKey{}
-		if err := json.Unmarshal(pair.Value, &user); err != nil {
-			return nil, err
-		}
-
-		users = append(users, user)
+		data = append(data, pair.Value)
 	}
 
-	return users, nil
+	return data, nil
 }
 
-func (c consulBackend) AddKey(key PublicKey) error {
+func (c consulBackend) Put(key string, data []byte) error {
 	kv := c.KV()
 
-	keyjson, err := json.Marshal(key)
-	if err != nil {
-		return err
-	}
-
-	pkKey := fmt.Sprintf("%s%s", pubKeyPrefix, key.Fingerprint)
-	p := &api.KVPair{Key: pkKey, Value: keyjson}
+	p := &api.KVPair{Key: key, Value: data}
 	if _, err := kv.Put(p, nil); err != nil {
 		return err
 	}
@@ -102,35 +105,22 @@ func (c consulBackend) AddKey(key PublicKey) error {
 	return nil
 }
 
-func (c consulBackend) DeleteKey(fingerprint string) error {
+func (c consulBackend) Delete(key string) error {
 	kv := c.KV()
 
-	pkKey := fmt.Sprintf("%s%s", pubKeyPrefix, fingerprint)
-
-	if _, err := kv.Delete(pkKey, nil); err != nil {
+	if _, err := kv.Delete(key, nil); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c consulBackend) GetKey(fingerprint string) (PublicKey, error) {
+func (c consulBackend) Get(key string) ([]byte, error) {
 	kv := c.KV()
-	pkKey := fmt.Sprintf("%s%s", pubKeyPrefix, fingerprint)
-
-	pair, _, err := kv.Get(pkKey, nil)
-	if pair == nil {
-		return PublicKey{}, PublicKeyNotFoundErr
+	pair, _, err := kv.Get(key, nil)
+	if pair == nil || err != nil {
+		return nil, NilValueErr
 	}
 
-	if err != nil {
-		return PublicKey{}, err
-	}
-
-	pk := PublicKey{}
-	if err := json.Unmarshal(pair.Value, &pk); err != nil {
-		return PublicKey{}, err
-	}
-
-	return pk, nil
+	return pair.Value, nil
 }

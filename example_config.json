@@ -1,0 +1,10 @@
+{
+  "http": ":8080",
+  "rpc": ":5127",
+  "gitpath": "./repositories",
+  "masteronly": true,
+  "backend": {
+    "type": "file",
+    "path": "./data"
+  }
+}

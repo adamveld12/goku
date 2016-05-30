@@ -1,4 +1,4 @@
-FROM golang:1.5.1-wheezy
+FROM golang:1.6.2-wheezy
 
 RUN apt-get update && apt-get install -y nginx
 
@@ -7,6 +7,6 @@ WORKDIR /go/src/github.com/adamveld12/goku/
 
 RUN go get
 
-EXPOSE 22 80
+EXPOSE 6789 80
 
 ENTRYPOINT go run *.go -debug
