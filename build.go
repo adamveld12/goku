@@ -33,6 +33,7 @@ func NewPushHandler(config Configuration) func(context gittp.HookContext, archiv
 			// TODO implement this
 		} else if p.Type == Docker {
 
+			context.Writeln("Building container")
 			c, err := buildContainer(p, config.DockerSock, config.Debug)
 			if err != nil {
 				logger.Error(err)
@@ -49,6 +50,7 @@ func NewPushHandler(config Configuration) func(context gittp.HookContext, archiv
 
 		logger.Trace("Push succeeded")
 		context.Writeln("Push succeeded")
+		context.Writeln("your app is running at http://" + p.Domain)
 	}
 }
 

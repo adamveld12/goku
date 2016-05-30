@@ -4,6 +4,10 @@
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/trusty64"
 
+  # Create a private network, which allows host-only access to the machine
+  # using a specific IP.
+  config.vm.network "private_network", ip: "192.168.50.4"
+
   # NGINX
   config.vm.network "forwarded_port", guest: 80, host: 3000
 
@@ -12,10 +16,6 @@ Vagrant.configure(2) do |config|
 
   # RPC
   config.vm.network "forwarded_port", guest: 5127, host: 5127
-
-  # Create a private network, which allows host-only access to the machine
-  # using a specific IP.
-  config.vm.network "public_network", ip: "192.168.99.100"
 
   config.vm.synced_folder "", "/go/src/github.com/adamveld12/goku"
 
@@ -44,13 +44,14 @@ Vagrant.configure(2) do |config|
      export GOPATH=/go
      export GOROOT=/usr/local/bin/go
      export PATH=$PATH:/usr/local/bin/go/bin
+
+     cd /go/src/github.com/adamveld12/goku;
+     echo "go getting deps for github.com/adamveld12/goku";
+     go get;
 RC
 
      sudo usermod -aG docker vagrant;
      sudo chown -R vagrant /go;
      sudo chown -R vagrant /etc/nginx;
-
-     go get github.com/adamveld12/goku
-
 SHELL
 end

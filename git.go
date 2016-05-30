@@ -51,7 +51,7 @@ func NewProject(repo io.Reader, pushedRepoName, commit, branch, domain string, s
 
 	l.Trace("Processing", pushedRepoName)
 	repoName := strings.Replace(pushedRepoName, ".git", "", -1)
-	repoName = strings.Replace(repoName, "/", "_", -1)
+	repoName = strings.Split(repoName, "/")[1]
 
 	if branch != "master" {
 		repoName = fmt.Sprintf("%s_%s", repoName, branch)

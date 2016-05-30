@@ -33,7 +33,7 @@ func buildContainer(proj Project, dockersock string, debug bool) (*docker.Contai
 	}
 
 	l.Trace("Cleaning duplicate containers")
-	proj.Status.Write([]byte("Checking for old containers -> \n"))
+	proj.Status.Write([]byte("Checking for old containers...\n"))
 	if err := cleanDuplicateContainer(client, proj); err != nil {
 		proj.Status.Write([]byte("Container check failed -> \n"))
 		proj.Status.Write([]byte(err.Error()))
@@ -42,7 +42,7 @@ func buildContainer(proj Project, dockersock string, debug bool) (*docker.Contai
 	}
 
 	l.Trace("Building image", containerImageName)
-	proj.Status.Write([]byte("Building image ->\n"))
+	proj.Status.Write([]byte("Building image...\n"))
 	if err := buildImage(client, containerImageName, proj.Archive); err != nil {
 		proj.Status.Write([]byte("Build failed\n"))
 		proj.Status.Write([]byte(err.Error()))
@@ -50,7 +50,7 @@ func buildContainer(proj Project, dockersock string, debug bool) (*docker.Contai
 	}
 
 	l.Trace("Launching container ", proj.Name)
-	proj.Status.Write([]byte("Launching container ->\n"))
+	proj.Status.Write([]byte("Launching container...\n"))
 	container, err := launchContainer(client, containerImageName, proj.Name)
 	if err != nil {
 		proj.Status.Write([]byte("Launch failed\n"))
