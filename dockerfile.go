@@ -12,7 +12,7 @@ import (
 func buildContainer(proj Project, dockersock string, debug bool) (*docker.Container, error) {
 	l := NewLog("\t[dockerfile builder]", debug)
 
-	containerImageName := fmt.Sprintf("%s-%s", proj.Branch, proj.Commit)
+	containerImageName := fmt.Sprintf("%s-%s", proj.Branch, proj.Name)
 
 	l.Trace("connecting to docker daemon running @", dockersock)
 
