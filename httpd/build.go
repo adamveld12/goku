@@ -1,4 +1,4 @@
-package goku
+package httpd
 
 import (
 	"fmt"
@@ -6,22 +6,23 @@ import (
 	"strings"
 
 	"github.com/adamveld12/gittp"
+	. "github.com/adamveld12/goku"
 )
 
-func NewPushHandler(config Configuration) func(context gittp.HookContext, archive io.Reader) {
-	logger := NewLog("[push handler]", config.Debug)
+func newPushHandler(hostname, dockersock string, debug bool) func(context gittp.HookContext, archive io.Reader) {
+	logger := NewLog("[push handler]", debug)
 	return func(context gittp.HookContext, archive io.Reader) {
 		cleanedBranchName := strings.TrimPrefix(context.Branch, "refs/heads/")
 		logger.Tracef("Got a push to \"%v\" on the \"%v\" branch.", context.Repository, cleanedBranchName)
 		context.Writeln(fmt.Sprintf("Got a push to the \"%v\" branch.", cleanedBranchName))
 
-		p, err := NewProject(archive,
+		p, err := newProject(archive,
 			context.Repository,
 			context.Commit,
 			cleanedBranchName,
-			config.Hostname,
+			hostname,
 			context,
-			config.Debug)
+			debug)
 
 		if err != nil {
 			logger.Error(err)
@@ -31,10 +32,11 @@ func NewPushHandler(config Configuration) func(context gittp.HookContext, archiv
 
 		if p.Type == Compose {
 			// TODO implement this
+			context.Writeln("Compose projects are currently not supported.")
 		} else if p.Type == Docker {
 
 			context.Writeln("Building container")
-			c, err := buildContainer(p, config.DockerSock, config.Debug)
+			c, err := buildContainer(p, dockersock, debug)
 			if err != nil {
 				logger.Error(err)
 				context.Writeln("Build failed")

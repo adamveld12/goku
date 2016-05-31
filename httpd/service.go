@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"encoding/base64"
 	"net"
 	"net/http"
 	"strings"
@@ -10,12 +11,16 @@ import (
 	"github.com/adamveld12/muxwrap"
 )
 
-func New(config Configuration, backend Backend) (*HttpService, error) {
+func init() {
+	RegisterService(newHTTPd)
+}
+
+func newHTTPd(config Configuration, backend Backend) Service {
 	cfg := gittp.ServerConfig{
 		Path:        config.GitPath,
 		PreReceive:  gittp.UseGithubRepoNames,
-		PostReceive: NewPushHandler(config),
-		Debug:       true,
+		PostReceive: newPushHandler(config.Hostname, config.DockerSock, config.Debug),
+		Debug:       config.Debug,
 	}
 
 	if config.MasterOnly {
@@ -23,34 +28,29 @@ func New(config Configuration, backend Backend) (*HttpService, error) {
 	}
 
 	hl := NewLog("[http]", config.Debug)
-	gittpHandler, err := gittp.NewGitServer(cfg)
-	if err != nil {
-		hl.Error(err)
-		return nil, err
-	}
+	gittpHandler, _ := gittp.NewGitServer(cfg)
 
-	hl.Trace("setting up git handlers")
-	gitHandler := muxwrap.New( /* BasicAuth(handleAuth) */ )
+	gitHandler := muxwrap.New( /* basicAuth(handleAuth) */ )
 	gitHandler.Handle("/", gittpHandler.ServeHTTP)
 
-	return &HttpService{
+	return &httpService{
 		Log:        hl,
-		config:     config,
+		addr:       config.HTTP,
 		gitHandler: gitHandler,
 		backend:    backend,
-	}, nil
+	}
 }
 
-type HttpService struct {
+type httpService struct {
 	Log
-	config     Configuration
+	addr       string
 	gitHandler http.Handler
 	backend    Backend
 	api        http.Handler
 	l          net.Listener
 }
 
-func (h *HttpService) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+func (h *httpService) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	h.Tracef("%v %v", req.Method, req.URL)
 
 	if strings.HasPrefix("/api/v1", req.URL.Path) {
@@ -60,19 +60,16 @@ func (h *HttpService) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (h *HttpService) Start() error {
-	addr := h.config.HTTP
-
-	h.Trace("starting http server")
-	l, err := net.Listen("tcp", addr)
+func (h *httpService) Start() error {
+	h.Trace("listening for git on ", h.addr)
+	l, err := net.Listen("tcp", h.addr)
 	if err != nil {
 		return err
 	}
 
 	h.l = l
-	go func(h *HttpService) {
+	go func(h *httpService) {
 		s := http.Server{Handler: h}
-		h.Trace("serving git on ", addr)
 
 		if err := s.Serve(h.l); err != nil {
 			// TODO if we get an error here, the daemon is hosed so we'll just panic
@@ -83,9 +80,42 @@ func (h *HttpService) Start() error {
 	return nil
 }
 
-func (h *HttpService) Stop() error {
-	if h.l != nil {
-		h.l.Close()
-	}
+func (h *httpService) Stop() error {
+	h.l.Close()
 	return nil
+}
+
+func basicAuth(auth func(username, pass string) error) muxwrap.Middleware {
+	return muxwrap.Middleware(func(next http.Handler) http.Handler {
+
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			res.Header().Set("WWW-Authenticate", `Basic realm="Goku"`)
+
+			s := strings.SplitN(req.Header.Get("Authorization"), " ", 2)
+			if len(s) != 2 {
+				http.Error(res, "Not authorized", 401)
+				return
+			}
+
+			b, err := base64.StdEncoding.DecodeString(s[1])
+			if err != nil {
+				http.Error(res, err.Error(), 401)
+				return
+			}
+
+			pair := strings.SplitN(string(b), ":", 2)
+			if len(pair) != 2 {
+				http.Error(res, "Not authorized", 401)
+				return
+			}
+
+			if err := auth(pair[0], pair[1]); err != nil {
+				http.Error(res, "Not authorized", 401)
+				return
+			}
+
+			next.ServeHTTP(res, req)
+		})
+
+	})
 }

@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
-	"os/signal"
 
 	"github.com/adamveld12/goku"
-	"github.com/adamveld12/goku/httpd"
+
+	_ "github.com/adamveld12/goku/httpd"
+	_ "github.com/adamveld12/goku/rpcd"
 )
 
 var (
@@ -50,28 +50,9 @@ func main() {
 
 func startServer(config goku.Configuration) func() int {
 	return func() int {
-		backend, _ := goku.NewBackend("debug", "")
-
-		sv, err := httpd.New(config, backend)
-		if err != nil {
+		if err := goku.StartServices(config); err != nil {
 			return 1
 		}
-
-		if err := sv.Start(); err != nil {
-			log.Println(err.Error())
-			return 1
-		}
-
-		sigs := make(chan os.Signal, 2)
-		signal.Notify(sigs, os.Interrupt)
-		<-sigs
-		signal.Stop(sigs)
-
-		fmt.Println("Stopping http server...")
-		if err := sv.Stop(); err != nil {
-			return 1
-		}
-
 		return 0
 	}
 }

@@ -1,4 +1,4 @@
-package goku
+package httpd
 
 import (
 	"archive/tar"
@@ -8,6 +8,8 @@ import (
 	"io"
 	"io/ioutil"
 	"strings"
+
+	. "github.com/adamveld12/goku"
 )
 
 var (
@@ -46,7 +48,7 @@ type Project struct {
 	Status io.Writer
 }
 
-func NewProject(repo io.Reader, pushedRepoName, commit, branch, domain string, status io.Writer, debug bool) (Project, error) {
+func newProject(repo io.Reader, pushedRepoName, commit, branch, domain string, status io.Writer, debug bool) (Project, error) {
 	l := NewLog("\t[project processor]", debug)
 
 	l.Trace("Processing", pushedRepoName)

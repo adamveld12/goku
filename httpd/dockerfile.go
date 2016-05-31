@@ -1,4 +1,4 @@
-package goku
+package httpd
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	. "github.com/adamveld12/goku"
 	docker "github.com/fsouza/go-dockerclient"
 )
 

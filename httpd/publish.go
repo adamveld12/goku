@@ -1,10 +1,11 @@
-package goku
+package httpd
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
 
+	. "github.com/adamveld12/goku"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
