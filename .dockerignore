@@ -1,1 +1,9 @@
 readme.md
+Vagrantfile
+.vagrant/
+bin/
+docs/
+makefile
+.gitignore
+repositories/*
+data/

@@ -1,21 +1,16 @@
-# Base run commad
-RUN=docker run -v /var/run/docker.sock:/var/run/docker.sock
-BUILD=docker build -t
+dev: build
+	./goku -debug -gitpath ./repositories -http ":8080" server
 
-up: build
-	docker-compose up
+vagrantdev: build nginx
+	./goku -debug -gitpath ./repositories -http ":8080" -host "192.168.50.4.xip.io" server
 
-build:
-	$(BUILD) adamveld12/goku .
+nginx:
+	cp ./nginx.conf /etc/nginx
+	sudo service nginx reload
 
-build_goku:
-	go build -o ./bin/goku .
+build: clean
+	go build -o ./goku ./cli/goku 
 
-dev:
-	$(RUN) -v $$PWD/:/go/src/github.com/adamveld12/goku --rm -it -p 3000:80 -p 2222:22 --entrypoint /bin/bash adamveld12/goku
-
-live: build
-	$(RUN) -d -p 2222:22 adamveld12/goku && $(UPLOAD)
-
-release: build
-	docker push adamveld12/goku
+clean:
+	rm -rf ./goku
+	rm -rf ./repositories
