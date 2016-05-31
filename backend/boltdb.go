@@ -9,6 +9,10 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+var (
+	errkeyEmpty = errors.New("Key must be non empty")
+)
+
 func init() {
 	RegisterBackend("file", newBoltBackend)
 }
@@ -30,7 +34,7 @@ type boltBackend struct {
 
 func (b boltBackend) GetList(keyPrefix string) ([][]byte, error) {
 	if keyPrefix == "" {
-		return nil, errors.New("Key must be non empty")
+		return nil, errkeyEmpty
 	}
 
 	keyb := []byte(keyPrefix)
@@ -56,7 +60,7 @@ func (b boltBackend) GetList(keyPrefix string) ([][]byte, error) {
 
 func (b boltBackend) Delete(key string) error {
 	if key == "" {
-		return errors.New("Key must be non empty")
+		return errkeyEmpty
 	}
 
 	keyb := []byte(key)
@@ -82,7 +86,7 @@ func (b boltBackend) Delete(key string) error {
 
 func (b boltBackend) Get(key string) ([]byte, error) {
 	if key == "" {
-		return nil, errors.New("Key must be non empty")
+		return nil, errkeyEmpty
 	}
 
 	keyb := []byte(key)
@@ -112,7 +116,7 @@ func (b boltBackend) Get(key string) ([]byte, error) {
 
 func (b boltBackend) Put(key string, data []byte) error {
 	if key == "" {
-		return errors.New("Key must be non empty")
+		return errkeyEmpty
 	}
 
 	keyb := []byte(key)
