@@ -6,11 +6,15 @@ import (
 	"strings"
 
 	"github.com/adamveld12/gittp"
-	. "github.com/adamveld12/goku"
+	"github.com/adamveld12/goku"
 )
 
-func newPushHandler(hostname, dockersock string, debug bool) func(context gittp.HookContext, archive io.Reader) {
-	logger := NewLog("[push handler]", debug)
+func newPushHandler(config goku.Configuration, backend goku.Backend) func(context gittp.HookContext, archive io.Reader) {
+	logger := goku.NewLog("[push handler]")
+	hostname := config.Hostname
+	//dockersock := config.DockerSock
+	debug := config.Debug
+
 	return func(context gittp.HookContext, archive io.Reader) {
 		cleanedBranchName := strings.TrimPrefix(context.Branch, "refs/heads/")
 		logger.Tracef("Got a push to \"%v\" on the \"%v\" branch.", context.Repository, cleanedBranchName)
@@ -30,13 +34,12 @@ func newPushHandler(hostname, dockersock string, debug bool) func(context gittp.
 			return
 		}
 
-		if p.Type == Compose {
+		if p.Type == compose {
 			// TODO implement this
 			context.Writeln("Compose projects are currently not supported.")
-		} else if p.Type == Docker {
-
+		} else if p.Type == dockerType {
 			context.Writeln("Building container")
-			c, err := buildContainer(p, dockersock, debug)
+			c, err := buildContainer(p, debug)
 			if err != nil {
 				logger.Error(err)
 				context.Writeln("Build failed")
@@ -54,8 +57,4 @@ func newPushHandler(hostname, dockersock string, debug bool) func(context gittp.
 		context.Writeln("Push succeeded")
 		context.Writeln("your app is running at http://" + p.Domain)
 	}
-}
-
-func handlePush(context gittp.HookContext, p Project) error {
-	return nil
 }

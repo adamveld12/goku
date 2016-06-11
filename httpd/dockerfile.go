@@ -6,32 +6,32 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/adamveld12/goku"
+	"github.com/adamveld12/goku"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
-func buildContainer(proj Project, dockersock string, debug bool) (*docker.Container, error) {
-	l := NewLog("\t[dockerfile builder]", debug)
+func NewDockerClient() *docker.Client {
+	client, err := docker.NewClient("unix:///var/run/docker.sock")
 
-	containerImageName := fmt.Sprintf("%s-%s", proj.Branch, proj.Name)
-
-	l.Trace("connecting to docker daemon running @", dockersock)
-
-	var client *docker.Client
-	var err error
-
-	if dockersock == "unix:///var/run/docker.sock" {
-		l.Trace("using", dockersock)
-		client, err = docker.NewClient(dockersock)
-	} else {
-		l.Trace("creating docker client from env")
+	if err != nil {
 		client, err = docker.NewClientFromEnv()
 	}
 
 	if err != nil {
-		l.Error(err)
-		return nil, err
+		panic(err)
 	}
+
+	return client
+}
+
+func buildContainer(proj Project, debug bool) (*docker.Container, error) {
+	l := goku.NewLog("\t[dockerfile builder]")
+
+	containerImageName := fmt.Sprintf("%s-%s", proj.Branch, proj.Name)
+
+	l.Trace("connecting to docker daemon")
+
+	client := NewDockerClient()
 
 	l.Trace("Cleaning duplicate containers")
 	proj.Status.Write([]byte("Checking for old containers...\n"))
@@ -124,11 +124,11 @@ func launchContainer(client *docker.Client, containerImageName, name string) (*d
 		return nil, err
 	}
 
-	targetImageId := images[0].ID
+	targetImageID := images[0].ID
 	container, err := client.CreateContainer(docker.CreateContainerOptions{
 		Name: name,
 		Config: &docker.Config{
-			Image: targetImageId,
+			Image: targetImageID,
 		},
 	})
 

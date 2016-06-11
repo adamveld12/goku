@@ -10,32 +10,37 @@ import (
 )
 
 const (
-	TraceFilter = "TRACE"
-	ErrorFilter = "ERROR"
-	FatalFilter = "FATAL"
+	traceFilter = "TRACE"
+	errorFilter = "ERROR"
+	fatalFilter = "FATAL"
 
-	debugMinLevel   = logutils.LogLevel(TraceFilter)
-	releaseMinLevel = logutils.LogLevel(ErrorFilter)
+	debugMinLevel   = logutils.LogLevel(traceFilter)
+	releaseMinLevel = logutils.LogLevel(errorFilter)
 )
 
-// NewLog creates a new log.Logger with log filtering
-func NewLog(label string, debugMode bool) Log {
-	minLevel := releaseMinLevel
+var (
+	filter *logutils.LevelFilter
+)
 
-	if debugMode {
+func init() {
+	minLevel := releaseMinLevel
+	if debug {
 		minLevel = debugMinLevel
 	}
 
-	filter := &logutils.LevelFilter{
+	filter = &logutils.LevelFilter{
 		Levels: []logutils.LogLevel{
-			TraceFilter,
-			ErrorFilter,
-			FatalFilter,
+			traceFilter,
+			errorFilter,
+			fatalFilter,
 		},
 		MinLevel: minLevel,
 		Writer:   os.Stderr,
 	}
+}
 
+// NewLog creates a new log.Logger with log filtering
+func NewLog(label string) Log {
 	return stdErrLogger{
 		log.New(filter, label+" ", log.LstdFlags),
 		color.New(color.FgBlue).SprintFunc(),
@@ -44,6 +49,7 @@ func NewLog(label string, debugMode bool) Log {
 	}
 }
 
+// Log is a simple interface to facilitate basic logging of errors and debug statements
 type Log interface {
 	Trace(...interface{})
 	Tracef(string, ...interface{})

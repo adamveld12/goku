@@ -1,28 +1,28 @@
-package goku
+package rpcd
 
 import (
 	"net"
 	"net/rpc"
 
-	. "github.com/adamveld12/goku"
+	"github.com/adamveld12/goku"
 )
 
 func init() {
-	RegisterService(newRPCd)
+	goku.RegisterService(newRPCd)
 }
 
-func newRPCd(config Configuration, backend Backend) Service {
+func newRPCd(config goku.Configuration, backend goku.Backend) goku.Service {
 	return &rpcService{
-		Log:     NewLog("[rpc]", config.Debug),
+		Log:     goku.NewLog("[rpc]"),
 		addr:    config.RPC,
 		backend: backend,
 	}
 }
 
 type rpcService struct {
-	Log
+	goku.Log
 	addr    string
-	backend Backend
+	backend goku.Backend
 	l       net.Listener
 }
 

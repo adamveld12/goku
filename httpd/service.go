@@ -7,19 +7,19 @@ import (
 	"strings"
 
 	"github.com/adamveld12/gittp"
-	. "github.com/adamveld12/goku"
+	"github.com/adamveld12/goku"
 	"github.com/adamveld12/muxwrap"
 )
 
 func init() {
-	RegisterService(newHTTPd)
+	goku.RegisterService(newHTTPd)
 }
 
-func newHTTPd(config Configuration, backend Backend) Service {
+func newHTTPd(config goku.Configuration, backend goku.Backend) goku.Service {
 	cfg := gittp.ServerConfig{
 		Path:        config.GitPath,
 		PreReceive:  gittp.UseGithubRepoNames,
-		PostReceive: newPushHandler(config.Hostname, config.DockerSock, config.Debug),
+		PostReceive: newPushHandler(config, backend),
 		Debug:       config.Debug,
 	}
 
@@ -27,7 +27,7 @@ func newHTTPd(config Configuration, backend Backend) Service {
 		cfg.PreReceive = gittp.CombinePreHooks(gittp.UseGithubRepoNames, gittp.MasterOnly)
 	}
 
-	hl := NewLog("[http]", config.Debug)
+	hl := goku.NewLog("[http]")
 	gittpHandler, _ := gittp.NewGitServer(cfg)
 
 	gitHandler := muxwrap.New( /* basicAuth(handleAuth) */ )
@@ -42,10 +42,10 @@ func newHTTPd(config Configuration, backend Backend) Service {
 }
 
 type httpService struct {
-	Log
+	goku.Log
 	addr       string
 	gitHandler http.Handler
-	backend    Backend
+	backend    goku.Backend
 	api        http.Handler
 	l          net.Listener
 }

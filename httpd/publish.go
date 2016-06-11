@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/exec"
 
-	. "github.com/adamveld12/goku"
+	"github.com/adamveld12/goku"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
@@ -40,7 +40,7 @@ func publish(proj Project, container *docker.Container) error {
 }
 
 func saveNginxProfile(domain, name, port string) error {
-	l := NewLog("[publish processor]", true)
+	l := goku.NewLog("[publish processor]")
 
 	siteAvailablePath := fmt.Sprintf("/etc/nginx/sites-available/%s", name)
 	fout, err := os.Create(siteAvailablePath)

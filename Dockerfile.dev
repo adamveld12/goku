@@ -1,0 +1,17 @@
+FROM go
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    nginx \
+    git \
+    tar
+
+
+WORKDIR /usr/local/bin/
+
+ENV GOPATH=/go
+ENV GOROOT=/usr/local/bin/go
+ENV PATH=$PATH:/usr/local/bin/go/bin
+
+
+

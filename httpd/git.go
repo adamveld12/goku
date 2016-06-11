@@ -9,21 +9,21 @@ import (
 	"io/ioutil"
 	"strings"
 
-	. "github.com/adamveld12/goku"
+	"github.com/adamveld12/goku"
 )
 
 var (
-	ErrCouldNotReadRepo    = errors.New("could not read repository")
-	ErrCouldNotReceiveRepo = errors.New("could not recieve repository")
-	ErrCouldNotReadFile    = errors.New("could not read file header from archive")
+	errCouldNotReadRepo    = errors.New("could not read repository")
+	errCouldNotReceiveRepo = errors.New("could not recieve repository")
+	errCouldNotReadFile    = errors.New("could not read file header from archive")
 )
 
-type ProjectType string
+type projectType string
 
 const (
-	Docker  = ProjectType("Dockerfile")
-	Compose = ProjectType("docker.compose.yml")
-	None    = ProjectType("None")
+	dockerType = projectType("Dockerfile")
+	compose    = projectType("docker.compose.yml")
+	none       = projectType("None")
 )
 
 // Project contains meta data about the pushed repository
@@ -43,13 +43,13 @@ type Project struct {
 	// Archive is the tar []byte that is pushed by Git archive
 	Archive []byte
 	// Type is the project type. Can be either a Docker or a Compose project
-	Type ProjectType
+	Type projectType
 
 	Status io.Writer
 }
 
 func newProject(repo io.Reader, pushedRepoName, commit, branch, domain string, status io.Writer, debug bool) (Project, error) {
-	l := NewLog("\t[project processor]", debug)
+	l := goku.NewLog("\t[project processor]")
 
 	l.Trace("Processing", pushedRepoName)
 	repoName := strings.Replace(pushedRepoName, ".git", "", -1)
@@ -62,7 +62,7 @@ func newProject(repo io.Reader, pushedRepoName, commit, branch, domain string, s
 	archive, err := ioutil.ReadAll(repo)
 	if err != nil {
 		l.Error("Could not open archive")
-		return Project{}, ErrCouldNotReceiveRepo
+		return Project{}, errCouldNotReceiveRepo
 	}
 
 	proj := Project{
@@ -71,7 +71,7 @@ func newProject(repo io.Reader, pushedRepoName, commit, branch, domain string, s
 		Name:    repoName,
 		Archive: archive,
 		Commit:  commit,
-		Type:    None,
+		Type:    none,
 		Status:  status,
 	}
 
@@ -85,7 +85,7 @@ func newProject(repo io.Reader, pushedRepoName, commit, branch, domain string, s
 		}
 
 		if err != nil {
-			return Project{}, ErrCouldNotReadRepo
+			return Project{}, errCouldNotReadRepo
 		}
 
 		if header.FileInfo().IsDir() {
@@ -104,16 +104,16 @@ func newProject(repo io.Reader, pushedRepoName, commit, branch, domain string, s
 			data, _ := ioutil.ReadAll(arch)
 			proj.Domain = string(data)
 			l.Trace("Found a CNAME file, using the domain", proj.Domain)
-		} else if fName == "Dockerfile" && proj.Type != Compose {
+		} else if fName == "Dockerfile" && proj.Type != compose {
 			l.Trace("Found a Dockerfile")
-			proj.Type = Docker
+			proj.Type = dockerType
 		} else if fName == "docker.compose.yml" {
 			l.Trace("Found a docker.compose.yml")
-			proj.Type = Compose
+			proj.Type = compose
 		}
 	}
 
-	if proj.Type == None {
+	if proj.Type == none {
 		l.Trace("Couldn't find a Dockerfile or docker.compose.yml")
 		return Project{}, errors.New("This project does not have a Dockerfile or a docker.compose.yml")
 	}

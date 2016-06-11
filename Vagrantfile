@@ -47,7 +47,7 @@ Vagrant.configure(2) do |config|
 
      cd /go/src/github.com/adamveld12/goku;
      echo "go getting deps for github.com/adamveld12/goku";
-     go get;
+     go get ./cli/goku;
 RC
 
      sudo usermod -aG docker vagrant;
