@@ -35,6 +35,7 @@ func main() {
 
 	commands = map[string]func() int{
 		"server": startServer(config),
+		"apps":   appsCmd(config),
 		//"agent":   agent.Command,
 	}
 
@@ -79,4 +80,11 @@ func createConfigFromFlags() (goku.Configuration, error) {
 	}
 
 	return cfg, nil
+}
+
+func appsCmd(config goku.Configuration) func() int {
+	return func() int {
+		// rpc := goku.NewRPCClient(config.
+		return -1
+	}
 }

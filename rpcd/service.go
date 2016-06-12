@@ -5,6 +5,7 @@ import (
 	"net/rpc"
 
 	"github.com/adamveld12/goku"
+	"github.com/adamveld12/goku/app"
 )
 
 func init() {
@@ -36,8 +37,8 @@ func (r *rpcService) Start() error {
 	r.l = l
 	go func(r *rpcService) {
 		rpcsrv := rpc.NewServer()
-		//    rpcsrv.Register()
-
+		rpcsrv.Register(app.NewRPC(r.backend))
+		//rpcsrv.Register(&NewUserStore(r.backend))
 		rpcsrv.Accept(r.l)
 	}(r)
 

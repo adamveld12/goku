@@ -1,4 +1,4 @@
-package httpd
+package app
 
 import (
 	"archive/tar"
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os/exec"
 	"strings"
 
 	"github.com/adamveld12/goku"
@@ -34,21 +35,17 @@ type Project struct {
 	Domain string
 	// TargetFilePath is the target file location of the repository
 	TargetFilePath string
-	// Name is the name of the pushed repository as per git@<goku server>:<some/path/name>
+	// Name is the name of the pushed repository as per http://<goku server addr>/username/<Project/Name/Here>.git
 	Name string
-	// Branch is the branch that was pushed
-	Branch string
 	// Commit is the commit hash for this project
 	Commit string
 	// Type is the project type. Can be either a Docker or a Compose project
 	Type projectType
 	// Archive is the tar []byte that is pushed by Git archive
 	Archive []byte
-	// Status is for status logging to the client
-	Status io.Writer
 }
 
-func newProject(gitArchive io.Reader, pushedRepoName, commit, branch, domain string, status io.Writer) (Project, error) {
+func newProject(fullRepoPath, pushedRepoName, branch, domain string) (Project, error) {
 	l := goku.NewLog("\t[project processor]")
 
 	l.Trace("Processing", pushedRepoName)
@@ -59,20 +56,19 @@ func newProject(gitArchive io.Reader, pushedRepoName, commit, branch, domain str
 		repoName = fmt.Sprintf("%s_%s", repoName, branch)
 	}
 
-	archive, err := ioutil.ReadAll(gitArchive)
+	archive, err := gitArchive(fullRepoPath, branch)
 	if err != nil {
 		l.Error("Could not open archive")
 		return Project{}, errCouldNotReceiveRepo
 	}
 
 	proj := Project{
-		Domain:  fmt.Sprintf("%s.%s", repoName, domain),
-		Branch:  branch,
-		Name:    repoName,
-		Commit:  commit,
-		Type:    none,
-		Archive: archive,
-		Status:  status,
+		Domain:         fmt.Sprintf("%s.%s", repoName, domain),
+		TargetFilePath: fullRepoPath,
+		Name:           repoName,
+		Commit:         branch,
+		Type:           none,
+		Archive:        archive,
 	}
 
 	for entry := range parseTAR(archive) {
@@ -98,6 +94,11 @@ func newProject(gitArchive io.Reader, pushedRepoName, commit, branch, domain str
 	}
 
 	return proj, nil
+}
+
+type tarEntry struct {
+	Name string
+	File io.Reader
 }
 
 func parseTAR(tarFile []byte) <-chan tarEntry {
@@ -133,7 +134,15 @@ func parseTAR(tarFile []byte) <-chan tarEntry {
 	return files
 }
 
-type tarEntry struct {
-	Name string
-	File io.Reader
+func gitArchive(fullRepoPath, hash string) ([]byte, error) {
+	cmd := exec.Command("git", "archive", hash)
+	cmd.Dir = fullRepoPath
+
+	tarArchive, err := cmd.Output()
+
+	if err != nil {
+		return nil, errors.New("Could not open archive")
+	}
+
+	return tarArchive, nil
 }

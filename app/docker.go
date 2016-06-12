@@ -1,8 +1,10 @@
-package httpd
+package app
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -12,7 +14,7 @@ import (
 
 var client *docker.Client
 
-func NewDockerClient() *docker.Client {
+func newDockerClient() *docker.Client {
 	if client != nil {
 		return client
 	}
@@ -32,37 +34,60 @@ func NewDockerClient() *docker.Client {
 	return client
 }
 
-func buildContainer(proj Project) (*docker.Container, error) {
+func killContainer(repository, commit string) error {
+	containerName := fmt.Sprintf("%s-%s", repository, commit)
+
+	containers, err := client.ListContainers(docker.ListContainersOptions{
+		Filters: map[string][]string{
+			"name": []string{containerName},
+		},
+	})
+
+	if err != nil || len(containers) <= 0 {
+		return errors.New("Could not find a matching container")
+	}
+
+	if err := client.KillContainer(docker.KillContainerOptions{containers[0].ID, docker.SIGTERM}); err != nil {
+		return fmt.Errorf("could not kill contianer %v", containerName)
+	}
+
+	return nil
+}
+
+func buildContainer(proj Project, status io.Writer) (*docker.Container, error) {
 	l := goku.NewLog("\t[dockerfile builder]")
 
-	containerImageName := fmt.Sprintf("%s-%s", proj.Branch, proj.Name)
+	containerImageName := fmt.Sprintf("%s-%s", proj.Commit, proj.Name)
 
-	client := NewDockerClient()
+	client := newDockerClient()
+
+	l.Trace("Building image", containerImageName)
+	status.Write([]byte("Building image...\n"))
+	if err := buildImage(proj.Name, proj.Archive); err != nil {
+		status.Write([]byte("Build failed\n"))
+		status.Write([]byte(err.Error()))
+		return nil, err
+	}
+
+	client.ListContainers(docker.ListContainersOptions{
+		Filters: map[string][]string{"name": []string{containerImageName}},
+	})
 
 	l.Trace("Cleaning duplicate containers")
-	proj.Status.Write([]byte("Checking for old containers...\n"))
-
+	status.Write([]byte("Checking for old containers...\n"))
 	if err := cleanDuplicateContainer(client, proj); err != nil {
-		proj.Status.Write([]byte("Container check failed -> \n"))
-		proj.Status.Write([]byte(err.Error()))
+		status.Write([]byte("Container check failed -> \n"))
+		status.Write([]byte(err.Error()))
 		l.Error("err cleaning containers", err)
 		return nil, err
 	}
 
-	l.Trace("Building image", containerImageName)
-	proj.Status.Write([]byte("Building image...\n"))
-	if err := buildImage(client, containerImageName, proj.Archive); err != nil {
-		proj.Status.Write([]byte("Build failed\n"))
-		proj.Status.Write([]byte(err.Error()))
-		return nil, err
-	}
-
 	l.Trace("Launching container ", proj.Name)
-	proj.Status.Write([]byte("Launching container...\n"))
-	container, err := launchContainer(client, containerImageName, proj.Name)
+	status.Write([]byte("Launching container...\n"))
+	container, err := launchContainer(proj.Name)
 	if err != nil {
-		proj.Status.Write([]byte("Launch failed\n"))
-		proj.Status.Write([]byte(err.Error()))
+		status.Write([]byte("Launch failed\n"))
+		status.Write([]byte(err.Error()))
 		return nil, err
 	}
 
@@ -109,7 +134,8 @@ func cleanDuplicateContainer(client *docker.Client, project Project) error {
 	return nil
 }
 
-func buildImage(client *docker.Client, name string, archive []byte) error {
+func buildImage(name string, archive []byte) error {
+	client := newDockerClient()
 
 	if err := client.BuildImage(docker.BuildImageOptions{
 		Name:         name,
@@ -123,9 +149,11 @@ func buildImage(client *docker.Client, name string, archive []byte) error {
 	return nil
 }
 
-func launchContainer(client *docker.Client, containerImageName, name string) (*docker.Container, error) {
+func launchContainer(name string) (*docker.Container, error) {
 
-	images, err := client.ListImages(docker.ListImagesOptions{Filter: containerImageName})
+	client := newDockerClient()
+
+	images, err := client.ListImages(docker.ListImagesOptions{Filter: name})
 
 	if err != nil {
 		return nil, err
@@ -138,6 +166,7 @@ func launchContainer(client *docker.Client, containerImageName, name string) (*d
 			Image: targetImageID,
 		},
 	})
+
 	if err != nil {
 		return nil, err
 	}

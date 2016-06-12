@@ -2,16 +2,10 @@ FROM go
 
 RUN apt-get update && apt-get install -y \
     curl \
-    nginx \
     git \
     tar
 
-
-WORKDIR /usr/local/bin/
-
-ENV GOPATH=/go
-ENV GOROOT=/usr/local/bin/go
-ENV PATH=$PATH:/usr/local/bin/go/bin
+ENV DEBUG=true
 
 
-
+ENTRYPOINT go get . && go run ./cli/goku/main.go
